@@ -514,9 +514,43 @@ class RigidMeshDeformer2D {
     }
     
     private func updateScaledTriangle(nTriangle: Int) {
-        // This is a complex matrix setup that would require a full
-        // port of the Wml::GMatrixd and related linear algebra code.
-        // For now, this is a placeholder.
+        var t = triangles[nTriangle]
+
+        let vDeformedV0 = deformedVerts[Int(t.verts[0])].position
+        let vDeformedV1 = deformedVerts[Int(t.verts[1])].position
+        let vDeformedV2 = deformedVerts[Int(t.verts[2])].position
+        let vDeformed: [Double] = [Double(vDeformedV0.x), Double(vDeformedV0.y),
+                                   Double(vDeformedV1.x), Double(vDeformedV1.y),
+                                   Double(vDeformedV2.x), Double(vDeformedV2.y)]
+
+        var mCVec = [Double](repeating: 0.0, count: 4)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, 4, 6, 1.0, t.c, 6, vDeformed, 1, 0.0, &mCVec, 1)
+
+        var vSolution = [Double](repeating: 0.0, count: 4)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, 4, 4, 1.0, t.f, 4, mCVec, 1, 0.0, &vSolution, 1)
+
+        var vFitted0 = Vector2f(Float(vSolution[0]), Float(vSolution[1]))
+        var vFitted1 = Vector2f(Float(vSolution[2]), Float(vSolution[3]))
+
+        let x01 = t.triCoords[0].x
+        let y01 = t.triCoords[0].y
+        let vFitted01 = vFitted1 - vFitted0
+        let vFitted01Perp = Vector2f(vFitted01.y, -vFitted01.x)
+        var vFitted2 = vFitted0 + x01 * vFitted01 + y01 * vFitted01Perp
+
+        let vOrigV0 = initialVerts[Int(t.verts[0])].position
+        let vOrigV1 = initialVerts[Int(t.verts[1])].position
+        let fScale = length(vOrigV1 - vOrigV0) / length(vFitted01)
+
+        vFitted0 *= fScale
+        vFitted1 *= fScale
+        vFitted2 *= fScale
+
+        t.scaled[0] = vFitted0
+        t.scaled[1] = vFitted1
+        t.scaled[2] = vFitted2
+        
+        triangles[nTriangle] = t
     }
     
     private func applyFittingStep() {

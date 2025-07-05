@@ -495,16 +495,39 @@ class RigidMeshDeformer2D {
     }
     
     private func validateDeformedMesh(rigid: Bool) {
-        if constraints.count < 2 {
+        let nConstraints = constraints.count
+        if nConstraints < 2 {
             return
         }
-        
+
         validateSetup()
-        
-        // This is a complex matrix setup that would require a full
-        // port of the Wml::GMatrixd and related linear algebra code.
-        // For now, this is a placeholder.
-        
+
+        let constraintsVec = constraints.sorted()
+        let nVerts = deformedVerts.count
+        let nFreeVerts = nVerts - nConstraints
+
+        var vQ = [Double](repeating: 0.0, count: 2 * nConstraints)
+        for (i, c) in constraintsVec.enumerated() {
+            vQ[2 * i] = Double(c.constrainedPos.x)
+            vQ[2 * i + 1] = Double(c.constrainedPos.y)
+        }
+
+        let freeSize = 2 * nFreeVerts
+        let constSize = 2 * nConstraints
+        var vU = [Double](repeating: 0.0, count: freeSize)
+
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, Int32(freeSize), Int32(constSize), 1.0, firstMatrix, Int32(constSize), vQ, 1, 0.0, &vU, 1)
+
+        for i in 0..<nVerts {
+            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            if !constraints.contains(c) {
+                let nRow = vertexMap[i]
+                let fX = vU[2 * nRow]
+                let fY = vU[2 * nRow + 1]
+                deformedVerts[i].position = Vector2f(Float(fX), Float(fY))
+            }
+        }
+
         if rigid {
             for i in 0..<triangles.count {
                 updateScaledTriangle(nTriangle: i)

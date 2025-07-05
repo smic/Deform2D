@@ -76,6 +76,22 @@ class TriangleMesh {
         return triangles.count / 3
     }
 
+    @discardableResult
+    func appendTriangle(v1: VertexIndex, v2: VertexIndex, v3: VertexIndex) -> TriangleIndex {
+        let newTriangleIndex = triangles.count / 3
+        triangles.append(v1)
+        triangles.append(v2)
+        triangles.append(v3)
+        return TriangleIndex(newTriangleIndex)
+    }
+
+    @discardableResult
+    func appendVertex(vertex: SIMD3<Float>) -> VertexIndex {
+        let newID = vertices.count
+        vertices.append(vertex)
+        return VertexIndex(newID)
+    }
+
     func setVertex(i: Int, v: SIMD3<Float>) {
         if i < vertices.count {
             vertices[i] = v

@@ -51,13 +51,13 @@ class TriangleMesh {
 
     func getTriangle(triangleIndex: TriangleIndex, vTriangle: inout [SIMD3<Float>], pNormals: inout [SIMD3<Float>]?) {
         let triIndices = self.getTriangleIndices(triangleIndex: triangleIndex)
-        vTriangle[0] = self.vertices[Int(triIndices[0])]
-        vTriangle[1] = self.vertices[Int(triIndices[1])]
-        vTriangle[2] = self.vertices[Int(triIndices[2])]
+        vTriangle[0] = self.vertices[triIndices[0]]
+        vTriangle[1] = self.vertices[triIndices[1]]
+        vTriangle[2] = self.vertices[triIndices[2]]
         if pNormals != nil {
-            pNormals![0] = self.normals[Int(triIndices[0])]
-            pNormals![1] = self.normals[Int(triIndices[1])]
-            pNormals![2] = self.normals[Int(triIndices[2])]
+            pNormals![0] = self.normals[triIndices[0]]
+            pNormals![1] = self.normals[triIndices[1]]
+            pNormals![2] = self.normals[triIndices[2]]
         }
     }
     
@@ -92,7 +92,7 @@ class TriangleMesh {
         return VertexIndex(newID)
     }
 
-    func setVertex(i: Int, v: SIMD3<Float>) {
+    func setVertex(i: VertexIndex, v: SIMD3<Float>) {
         if i < self.vertices.count {
             self.vertices[i] = v
         }

@@ -4,8 +4,17 @@ import simd
 
 @Observable
 final class DeformationViewModel {
-    var deformedMesh: TriangleMesh
-    var selectedVertices: Set<TriangleMesh.VertexIndex> = []
+    @ObservationIgnored
+    var deformedMesh: TriangleMesh {
+        didSet {
+            print("did set deformedMesh")
+        }
+    }
+    var selectedVertices: Set<TriangleMesh.VertexIndex> = [] {
+        didSet {
+            print("did set selectedVertices:", self.selectedVertices)
+        }
+    }
 
     @ObservationIgnored
     private var deformer = RigidMeshDeformer2D()
@@ -13,8 +22,12 @@ final class DeformationViewModel {
     private var initialMesh: TriangleMesh
     @ObservationIgnored
     private var constraintsValid: Bool = false
-    @ObservationIgnored
-    private var selectedVertex: TriangleMesh.VertexIndex? = nil
+    private var selectedVertex: TriangleMesh.VertexIndex? = nil  {
+        didSet {
+            print("did set selectedVertex:", self.selectedVertex)
+        }
+    }
+    
 
     init() {
         let mesh = TriangleMesh()
@@ -92,22 +105,26 @@ final class DeformationViewModel {
     }
 
     func handleDrag(point: CGPoint, size: CGSize) {
-        if let selectedVertex = selectedVertex {
+        print("handleDrag:", point, "selectedVertex:", selectedVertex)
+        if let selectedVertex = self.selectedVertex {
             let scale = 0.5 * min(size.width, size.height) / 2.0
             let translate = SIMD2<Float>(Float(size.width / 2), Float(size.height / 2))
             let worldPos = (SIMD2<Float>(Float(point.x), Float(point.y)) - translate) / Float(scale)
-            self.deformedMesh.setVertex(i: Int(selectedVertex), v: SIMD3<Float>(worldPos.x, worldPos.y, 0))
+            print("deform:", selectedVertex, "x:", worldPos.x, "y:", worldPos.y)
+            self.deformedMesh.setVertex(i: selectedVertex, v: SIMD3<Float>(worldPos.x, worldPos.y, 0))
             self.invalidateConstraints()
         }
     }
 
     func selectVertex(point: CGPoint, size: CGSize) {
+        print("selectVertex:", findHitVertex(point: point, size: size))
         if let hit = findHitVertex(point: point, size: size) {
             self.selectedVertex = hit
         }
     }
 
     func toggleSelection(point: CGPoint, size: CGSize) {
+        print("toggle Selection:", findHitVertex(point: point, size: size))
         if let hit = findHitVertex(point: point, size: size) {
             if self.selectedVertices.contains(hit) {
                 self.selectedVertices.remove(hit)

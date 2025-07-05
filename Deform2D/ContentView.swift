@@ -9,8 +9,12 @@ import SwiftUI
 
 struct ContentView: View {
     @State private var viewModel = DeformationViewModel()
+    @State private var dragStarted: Bool = false
+    @State private var updateCounter: Int = 0
 
     var body: some View {
+        let _ = print("Update View:", self.updateCounter)
+        let _ = Self._printChanges()
         GeometryReader { geometry in
             Canvas { context, size in
                 self.viewModel.updateDeformedMesh()
@@ -19,14 +23,14 @@ struct ContentView: View {
                 let translate = SIMD2<Float>(Float(size.width / 2), Float(size.height / 2))
 
                 for i in 0 ..< self.viewModel.deformedMesh.getNumTriangles() {
-                    var triVerts = [SIMD3<Float>](repeating: .zero, count: 3)
+                    var triVertices = [SIMD3<Float>](repeating: .zero, count: 3)
                     var normals: [SIMD3<Float>]? = nil
-                    self.viewModel.deformedMesh.getTriangle(triangleIndex: i, vTriangle: &triVerts, pNormals: &normals)
+                    self.viewModel.deformedMesh.getTriangle(triangleIndex: i, vTriangle: &triVertices, pNormals: &normals)
 
                     var path = Path()
-                    let v1 = SIMD2<Float>(triVerts[0].x, triVerts[0].y) * Float(scale) + translate
-                    let v2 = SIMD2<Float>(triVerts[1].x, triVerts[1].y) * Float(scale) + translate
-                    let v3 = SIMD2<Float>(triVerts[2].x, triVerts[2].y) * Float(scale) + translate
+                    let v1 = SIMD2<Float>(triVertices[0].x, triVertices[0].y) * Float(scale) + translate
+                    let v2 = SIMD2<Float>(triVertices[1].x, triVertices[1].y) * Float(scale) + translate
+                    let v3 = SIMD2<Float>(triVertices[2].x, triVertices[2].y) * Float(scale) + translate
                     path.move(to: CGPoint(x: CGFloat(v1.x), y: CGFloat(v1.y)))
                     path.addLine(to: CGPoint(x: CGFloat(v2.x), y: CGFloat(v2.y)))
                     path.addLine(to: CGPoint(x: CGFloat(v3.x), y: CGFloat(v3.y)))
@@ -34,6 +38,7 @@ struct ContentView: View {
                     context.stroke(path, with: .color(.black), lineWidth: 2)
                 }
 
+                print("self.viewModel.selectedVertices:", self.viewModel.selectedVertices)
                 for selected in self.viewModel.selectedVertices {
                     var v = SIMD3<Float>()
                     var n: SIMD3<Float>?
@@ -44,26 +49,47 @@ struct ContentView: View {
                 }
             }
             .gesture(
-                DragGesture(minimumDistance: 0)
+                DragGesture(minimumDistance: 1)
                     .onChanged { value in
-                        if self.viewModel.selectedVertices.isEmpty {
-                            self.viewModel.selectVertex(point: value.startLocation, size: geometry.size)
+                        if !self.dragStarted {
+                            viewModel.selectVertex(point: value.startLocation, size: geometry.size)
+                            print("Drag started")
+                            self.dragStarted = true
                         }
-                        self.viewModel.handleDrag(point: value.location, size: geometry.size)
+//                        if /*viewModel.selectedVertices.isEmpty*/viewModel.selectedVertex == nil {
+//                            viewModel.selectVertex(point: value.location, size: geometry.size)
+//                        }
+                        viewModel.handleDrag(point: value.location, size: geometry.size)
+                        self.updateCounter += 1
                     }
-                    .onEnded { _ in
-                        self.viewModel.releaseSelection()
+                    .onEnded { value in
+                        viewModel.releaseSelection()
+                        self.dragStarted = false
+                        self.updateCounter += 1
                     }
-            )
-            .gesture(
-                TapGesture()
-                    .onEnded {
-                        // This is a bit of a hack to get both tap and drag gestures to work
-                        // a better solution would be to use a custom gesture recognizer
-                        if let hit = viewModel.findHitVertex(point: CGPoint(x: 0, y: 0), size: geometry.size) {
-                            self.viewModel.toggleSelection(point: CGPoint(x: 0, y: 0), size: geometry.size)
+                    .simultaneously(with:
+                                        SpatialTapGesture()
+                        .onEnded { event in
+                            viewModel.toggleSelection(point: event.location, size: geometry.size)
+                            self.updateCounter += 1
                         }
-                    }
+                                   )
+                
+                
+//                TapAndDragGesture {
+//                    event in
+//                    switch event {
+//                    case .tap(let location):
+//                        viewModel.toggleSelection(point: location, size: geometry.size)
+//                    case .drag(let location, let start):
+//                        if viewModel.selectedVertices.isEmpty {
+//                            viewModel.selectVertex(point: start, size: geometry.size)
+//                        }
+//                        viewModel.handleDrag(point: location, size: geometry.size)
+//                    case .release:
+//                        viewModel.releaseSelection()
+//                    }
+//                }
             )
         }
     }

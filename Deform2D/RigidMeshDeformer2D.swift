@@ -283,19 +283,19 @@ class RigidMeshDeformer2D {
             }
         }
 
-        var ipiv = [__CLPK_integer](repeating: 0, count: freeSize)
-        var lwork = __CLPK_integer(freeSize * freeSize)
-        var work = [__CLPK_doublereal](repeating: 0, count: Int(lwork))
-        var error: __CLPK_integer = 0
-        var n = __CLPK_integer(freeSize)
+        var ipiv = [__LAPACK_int](repeating: 0, count: freeSize)
+        var lwork = __LAPACK_int(freeSize * freeSize)
+        var work = [Double](repeating: 0, count: Int(lwork))
+        var error: __LAPACK_int = 0
+        var n_lapack = __LAPACK_int(freeSize)
 
-        dgetrf_(&n, &n, &gPrime, &n, &ipiv, &error)
+        dgetrf_(&n_lapack, &n_lapack, &gPrime, &n_lapack, &ipiv, &error)
         if error != 0 {
             print("Error in LU factorization")
             return
         }
 
-        dgetri_(&n, &gPrime, &n, &ipiv, &work, &lwork, &error)
+        dgetri_(&n_lapack, &gPrime, &n_lapack, &ipiv, &work, &lwork, &error)
         if error != 0 {
             print("Error in matrix inversion")
             return
@@ -304,12 +304,11 @@ class RigidMeshDeformer2D {
         var finalMatrix = [Double](repeating: 0.0, count: freeSize * constSize)
         let alpha = -1.0
         let beta = 0.0
-        var m = __CLPK_integer(freeSize)
-        var k = __CLPK_integer(constSize)
-        n = __CLPK_integer(freeSize)
+        let M = Int32(freeSize)
+        let N = Int32(constSize)
+        let K = Int32(freeSize)
 
-
-        dgemm_("N".cString(using: .utf8)!, "N".cString(using: .utf8)!, &m, &k, &n, &alpha, &gPrime, &m, &b, &n, &beta, &finalMatrix, &m)
+        cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, &gPrime, K, &b, N, beta, &finalMatrix, N)
 
         self.firstMatrix = finalMatrix
     }

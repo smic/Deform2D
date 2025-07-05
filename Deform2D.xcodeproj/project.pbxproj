@@ -6,10 +6,6 @@
 	objectVersion = 77;
 	objects = {
 
-/* Begin PBXBuildFile section */
-		D49285C72E19117C00F5DAF4 /* GEMINI.md in Sources */ = {isa = PBXBuildFile; fileRef = D49285C62E19117200F5DAF4 /* GEMINI.md */; };
-/* End PBXBuildFile section */
-
 /* Begin PBXFileReference section */
 		D49278BA2E19107E00F5DAF4 /* Deform2D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Deform2D.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		D49285C62E19117200F5DAF4 /* GEMINI.md */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GEMINI.md; sourceTree = "<group>"; };
@@ -131,7 +127,6 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				D49285C72E19117C00F5DAF4 /* GEMINI.md in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -183,7 +178,9 @@
 				GCC_OPTIMIZATION_LEVEL = 0;
 				GCC_PREPROCESSOR_DEFINITIONS = (
 					"DEBUG=1",
+					"ACCELERATE_NEW_LAPACK=1",
 					"$(inherited)",
+					"ACCELERATE_LAPACK_ILP64=1",
 				);
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
@@ -241,6 +238,11 @@
 				ENABLE_USER_SCRIPT_SANDBOXING = YES;
 				GCC_C_LANGUAGE_STANDARD = gnu17;
 				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"ACCELERATE_NEW_LAPACK=1",
+					"$(inherited)",
+					"ACCELERATE_LAPACK_ILP64=1",
+				);
 				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
 				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
 				GCC_WARN_UNDECLARED_SELECTOR = YES;

@@ -1,6 +1,7 @@
 
 import Foundation
 import simd
+import Accelerate
 
 typealias Vector2f = SIMD2<Float>
 typealias Vector3f = SIMD3<Float>
@@ -35,7 +36,7 @@ class RigidMeshDeformer2D {
     private var constraints: Set<Constraint> = []
     private var setupValid: Bool = false
     
-    private var firstMatrix: Matrix = Matrix()
+    private var firstMatrix: [Double] = []
     private var vertexMap: [Int] = []
     private var hxPrime: Matrix = Matrix()
     private var hyPrime: Matrix = Matrix()
@@ -179,9 +180,138 @@ class RigidMeshDeformer2D {
     }
     
     private func precomputeOrientationMatrix() {
-        // This is a complex matrix setup that would require a full
-        // port of the Wml::GMatrixd and related linear algebra code.
-        // For now, this is a placeholder.
+        let constraintsVec = constraints.sorted()
+        let nVerts = deformedVerts.count
+        let nConstraints = constraintsVec.count
+        let nFreeVerts = nVerts - nConstraints
+
+        vertexMap = [Int](repeating: 0, count: nVerts)
+        var nRow = 0
+        for i in 0..<nVerts {
+            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            if !constraints.contains(c) {
+                vertexMap[i] = nRow
+                nRow += 1
+            }
+        }
+        for i in 0..<nConstraints {
+            vertexMap[Int(constraintsVec[i].vertex)] = nRow
+            nRow += 1
+        }
+
+        let matrixSize = 2 * nVerts
+        var firstMatrix = [Double](repeating: 0.0, count: matrixSize * matrixSize)
+
+        for i in 0..<triangles.count {
+            let t = triangles[i]
+            for j in 0..<3 {
+                let n0x = 2 * vertexMap[Int(t.verts[j])]
+                let n0y = n0x + 1
+                let n1x = 2 * vertexMap[Int(t.verts[(j + 1) % 3])]
+                let n1y = n1x + 1
+                let n2x = 2 * vertexMap[Int(t.verts[(j + 2) % 3])]
+                let n2y = n2x + 1
+                let x = Double(t.triCoords[j].x)
+                let y = Double(t.triCoords[j].y)
+
+                // n0x,n?? elems
+                firstMatrix[n0x * matrixSize + n0x] += 1 - 2*x + x*x + y*y
+                firstMatrix[n0x * matrixSize + n1x] += 2*x - 2*x*x - 2*y*y
+                firstMatrix[n0x * matrixSize + n1y] += 2*y
+                firstMatrix[n0x * matrixSize + n2x] += -2 + 2*x
+                firstMatrix[n0x * matrixSize + n2y] += -2 * y
+
+                // n0y,n?? elems
+                firstMatrix[n0y * matrixSize + n0y] += 1 - 2*x + x*x + y*y
+                firstMatrix[n0y * matrixSize + n1x] += -2*y
+                firstMatrix[n0y * matrixSize + n1y] += 2*x - 2*x*x - 2*y*y
+                firstMatrix[n0y * matrixSize + n2x] += 2*y
+                firstMatrix[n0y * matrixSize + n2y] += -2 + 2*x
+
+                // n1x,n?? elems
+                firstMatrix[n1x * matrixSize + n1x] += x*x + y*y
+                firstMatrix[n1x * matrixSize + n2x] += -2*x
+                firstMatrix[n1x * matrixSize + n2y] += 2*y
+
+                //n1y,n?? elems
+                firstMatrix[n1y * matrixSize + n1y] += x*x + y*y
+                firstMatrix[n1y * matrixSize + n2x] += -2*y
+                firstMatrix[n1y * matrixSize + n2y] += -2*x
+
+                // final 2 elems
+                firstMatrix[n2x * matrixSize + n2x] += 1
+                firstMatrix[n2y * matrixSize + n2y] += 1
+            }
+        }
+
+        let freeSize = 2 * nFreeVerts
+        let constSize = 2 * nConstraints
+
+        var g00 = [Double](repeating: 0.0, count: freeSize * freeSize)
+        var g01 = [Double](repeating: 0.0, count: freeSize * constSize)
+        var g10 = [Double](repeating: 0.0, count: constSize * freeSize)
+
+        for i in 0..<freeSize {
+            for j in 0..<freeSize {
+                g00[i * freeSize + j] = firstMatrix[i * matrixSize + j]
+            }
+        }
+
+        for i in 0..<freeSize {
+            for j in 0..<constSize {
+                g01[i * constSize + j] = firstMatrix[i * matrixSize + (j + freeSize)]
+            }
+        }
+
+        for i in 0..<constSize {
+            for j in 0..<freeSize {
+                g10[i * freeSize + j] = firstMatrix[(i + freeSize) * matrixSize + j]
+            }
+        }
+
+        var gPrime = g00
+        for i in 0..<freeSize {
+            for j in 0..<freeSize {
+                gPrime[i * freeSize + j] += g00[j * freeSize + i]
+            }
+        }
+
+        var b = g01
+        for i in 0..<freeSize {
+            for j in 0..<constSize {
+                b[i * constSize + j] += g10[j * freeSize + i]
+            }
+        }
+
+        var ipiv = [__CLPK_integer](repeating: 0, count: freeSize)
+        var lwork = __CLPK_integer(freeSize * freeSize)
+        var work = [__CLPK_doublereal](repeating: 0, count: Int(lwork))
+        var error: __CLPK_integer = 0
+        var n = __CLPK_integer(freeSize)
+
+        dgetrf_(&n, &n, &gPrime, &n, &ipiv, &error)
+        if error != 0 {
+            print("Error in LU factorization")
+            return
+        }
+
+        dgetri_(&n, &gPrime, &n, &ipiv, &work, &lwork, &error)
+        if error != 0 {
+            print("Error in matrix inversion")
+            return
+        }
+
+        var finalMatrix = [Double](repeating: 0.0, count: freeSize * constSize)
+        let alpha = -1.0
+        let beta = 0.0
+        var m = __CLPK_integer(freeSize)
+        var k = __CLPK_integer(constSize)
+        n = __CLPK_integer(freeSize)
+
+
+        dgemm_("N".cString(using: .utf8)!, "N".cString(using: .utf8)!, &m, &k, &n, &alpha, &gPrime, &m, &b, &n, &beta, &finalMatrix, &m)
+
+        self.firstMatrix = finalMatrix
     }
     
     private func precomputeScalingMatrices(nTriangle: Int) {

@@ -36,17 +36,20 @@ class RigidMeshDeformer2D {
     private var constraints: Set<Constraint> = []
     private var setupValid: Bool = false
     
+    struct LUDecomposition {
+        var luMatrix: [Double]
+        var pivotIndices: [__LAPACK_int]
+    }
+
     private var firstMatrix: [Double] = []
     private var vertexMap: [Int] = []
-    private var hxPrime: Matrix = Matrix()
-    private var hyPrime: Matrix = Matrix()
-    private var dx: Matrix = Matrix()
-    private var dy: Matrix = Matrix()
+    private var hxPrime: [Double] = []
+    private var hyPrime: [Double] = []
+    private var dx: [Double] = []
+    private var dy: [Double] = []
     
-    // These would need a proper implementation of LUDecomposition
-    // For now, just placeholder types
-    private var luDecompX: Any?
-    private var luDecompY: Any?
+    private var luDecompX: LUDecomposition?
+    private var luDecompY: LUDecomposition?
     
     
     init() {
@@ -411,9 +414,84 @@ class RigidMeshDeformer2D {
     }
     
     private func precomputeFittingMatrices() {
-        // This is a complex matrix setup that would require a full
-        // port of the Wml::GMatrixd and related linear algebra code.
-        // For now, this is a placeholder.
+        let constraintsVec = constraints.sorted()
+        let nVerts = deformedVerts.count
+        let nConstraints = constraintsVec.count
+        let nFreeVerts = nVerts - nConstraints
+
+        vertexMap = [Int](repeating: 0, count: nVerts)
+        var nRow = 0
+        for i in 0..<nVerts {
+            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            if !constraints.contains(c) {
+                vertexMap[i] = nRow
+                nRow += 1
+            }
+        }
+        for i in 0..<nConstraints {
+            vertexMap[Int(constraintsVec[i].vertex)] = nRow
+            nRow += 1
+        }
+
+        var hX = [Double](repeating: 0.0, count: nVerts * nVerts)
+        var hY = [Double](repeating: 0.0, count: nVerts * nVerts)
+
+        for i in 0..<triangles.count {
+            let t = triangles[i]
+            for j in 0..<3 {
+                let nA = vertexMap[Int(t.verts[j])]
+                let nB = vertexMap[Int(t.verts[(j + 1) % 3])]
+
+                hX[nA * nVerts + nA] += 2
+                hX[nA * nVerts + nB] += -2
+                hX[nB * nVerts + nA] += -2
+                hX[nB * nVerts + nB] += 2
+
+                hY[nA * nVerts + nA] += 2
+                hY[nA * nVerts + nB] += -2
+                hY[nB * nVerts + nA] += -2
+                hY[nB * nVerts + nB] += 2
+            }
+        }
+
+        var hX00 = [Double](repeating: 0.0, count: nFreeVerts * nFreeVerts)
+        var hY00 = [Double](repeating: 0.0, count: nFreeVerts * nFreeVerts)
+        for i in 0..<nFreeVerts {
+            for j in 0..<nFreeVerts {
+                hX00[i * nFreeVerts + j] = hX[i * nVerts + j]
+                hY00[i * nFreeVerts + j] = hY[i * nVerts + j]
+            }
+        }
+
+        var hX01 = [Double](repeating: 0.0, count: nFreeVerts * nConstraints)
+        var hY01 = [Double](repeating: 0.0, count: nFreeVerts * nConstraints)
+        for i in 0..<nFreeVerts {
+            for j in 0..<nConstraints {
+                hX01[i * nConstraints + j] = hX[i * nVerts + (j + nFreeVerts)]
+                hY01[i * nConstraints + j] = hY[i * nVerts + (j + nFreeVerts)]
+            }
+        }
+
+        hxPrime = hX00
+        hyPrime = hY00
+        dx = hX01
+        dy = hY01
+
+        var ipivX = [__LAPACK_int](repeating: 0, count: nFreeVerts)
+        var errorX: __LAPACK_int = 0
+        var n_lapackX = __LAPACK_int(nFreeVerts)
+        dgetrf_(&n_lapackX, &n_lapackX, &hxPrime, &n_lapackX, &ipivX, &errorX)
+        if errorX == 0 {
+            luDecompX = LUDecomposition(luMatrix: hxPrime, pivotIndices: ipivX)
+        }
+
+        var ipivY = [__LAPACK_int](repeating: 0, count: nFreeVerts)
+        var errorY: __LAPACK_int = 0
+        var n_lapackY = __LAPACK_int(nFreeVerts)
+        dgetrf_(&n_lapackY, &n_lapackY, &hyPrime, &n_lapackY, &ipivY, &errorY)
+        if errorY == 0 {
+            luDecompY = LUDecomposition(luMatrix: hyPrime, pivotIndices: ipivY)
+        }
     }
     
     private func validateDeformedMesh(rigid: Bool) {

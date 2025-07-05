@@ -6,14 +6,24 @@
 	objectVersion = 77;
 	objects = {
 
+/* Begin PBXBuildFile section */
+		D49285C72E19117C00F5DAF4 /* GEMINI.md in Sources */ = {isa = PBXBuildFile; fileRef = D49285C62E19117200F5DAF4 /* GEMINI.md */; };
+/* End PBXBuildFile section */
+
 /* Begin PBXFileReference section */
 		D49278BA2E19107E00F5DAF4 /* Deform2D.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Deform2D.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		D49285C62E19117200F5DAF4 /* GEMINI.md */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GEMINI.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D49278BC2E19107E00F5DAF4 /* Deform2D */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
 			path = Deform2D;
+			sourceTree = "<group>";
+		};
+		D49285C52E1910E000F5DAF4 /* Deform2D-Original */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = "Deform2D-Original";
 			sourceTree = "<group>";
 		};
 /* End PBXFileSystemSynchronizedRootGroup section */
@@ -32,6 +42,8 @@
 		D49278B12E19107E00F5DAF4 = {
 			isa = PBXGroup;
 			children = (
+				D49285C62E19117200F5DAF4 /* GEMINI.md */,
+				D49285C52E1910E000F5DAF4 /* Deform2D-Original */,
 				D49278BC2E19107E00F5DAF4 /* Deform2D */,
 				D49278BB2E19107E00F5DAF4 /* Products */,
 			);
@@ -119,6 +131,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				D49285C72E19117C00F5DAF4 /* GEMINI.md in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -267,6 +280,11 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Deform2D-Original/Wml/Release",
+					"$(PROJECT_DIR)/Deform2D-Original",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.stephanmichels.Deform2D;
@@ -310,6 +328,11 @@
 				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
 				LD_RUNPATH_SEARCH_PATHS = "@executable_path/Frameworks";
 				"LD_RUNPATH_SEARCH_PATHS[sdk=macosx*]" = "@executable_path/../Frameworks";
+				LIBRARY_SEARCH_PATHS = (
+					"$(inherited)",
+					"$(PROJECT_DIR)/Deform2D-Original/Wml/Release",
+					"$(PROJECT_DIR)/Deform2D-Original",
+				);
 				MACOSX_DEPLOYMENT_TARGET = 26.0;
 				MARKETING_VERSION = 1.0;
 				PRODUCT_BUNDLE_IDENTIFIER = de.stephanmichels.Deform2D;

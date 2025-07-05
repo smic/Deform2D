@@ -17,8 +17,8 @@ class RigidMeshDeformer2D {
         var verts: [UInt32] = [0,0,0]
         var triCoords: [Vector2f] = [Vector2f.zero, Vector2f.zero, Vector2f.zero]
         var scaled: [Vector2f] = [Vector2f.zero, Vector2f.zero, Vector2f.zero]
-        var f: Matrix = Matrix()
-        var c: Matrix = Matrix()
+        var f: [Double] = []
+        var c: [Double] = []
     }
     
     struct Constraint: Comparable, Hashable {
@@ -314,9 +314,100 @@ class RigidMeshDeformer2D {
     }
     
     private func precomputeScalingMatrices(nTriangle: Int) {
-        // This is a complex matrix setup that would require a full
-        // port of the Wml::GMatrixd and related linear algebra code.
-        // For now, this is a placeholder.
+        var t = triangles[nTriangle]
+
+        t.f = [Double](repeating: 0.0, count: 16)
+        t.c = [Double](repeating: 0.0, count: 24)
+
+        let x01 = Double(t.triCoords[0].x)
+        let y01 = Double(t.triCoords[0].y)
+        let x12 = Double(t.triCoords[1].x)
+        let y12 = Double(t.triCoords[1].y)
+        let x20 = Double(t.triCoords[2].x)
+        let y20 = Double(t.triCoords[2].y)
+
+        let k1 = x12*y01 + (-1 + x01)*y12
+        let k2 = -x12 + x01*x12 - y01*y12
+        let k3 = -y01 + x20*y01 + x01*y20
+        let k4 = -y01 + x01*y01 + x01*y20
+        let k5 = -x01 + x01*x20 - y01*y20
+
+        let a = -1 + x01
+        let a1 = pow(-1 + x01,2) + pow(y01,2)
+        let a2 = pow(x01,2) + pow(y01,2)
+        let b =  -1 + x20
+        let b1 = pow(-1 + x20,2) + pow(y20,2)
+        let c2 = pow(x12,2) + pow(y12,2)
+
+        let r1 = 1 + 2*a*x12 + a1*pow(x12,2) - 2*y01*y12 + a1*pow(y12,2)
+        let r2 = -(b*x01) - b1*pow(x01,2) + y01*(-(b1*y01) + y20)
+        let r3 = -(a*x12) - a1*pow(x12,2) + y12*(y01 - a1*y12)
+        let r5 = a*x01 + pow(y01,2)
+        let r6 = -(b*y01) - x01*y20
+        let r7 = 1 + 2*b*x01 + b1*pow(x01,2) + b1*pow(y01,2) - 2*y01*y20
+
+        //  set up F matrix
+        t.f[0] = 2*a1 + 2*a1*c2 + 2*r7
+        t.f[1] = 0
+        t.f[2] = 2*r2 + 2*r3 - 2*r5
+        t.f[3] = 2*k1 + 2*r6 + 2*y01
+
+        t.f[4] = 0
+        t.f[5] = 2*a1 + 2*a1*c2 + 2*r7
+        t.f[6] = -2*k1 + 2*k3 - 2*y01
+        t.f[7] = 2*r2 + 2*r3 - 2*r5
+
+        t.f[8] = 2*r2 + 2*r3 - 2*r5
+        t.f[9] = -2*k1 + 2*k3 - 2*y01
+        t.f[10] = 2*a2 + 2*a2*b1 + 2*r1
+        t.f[11] = 0
+
+        t.f[12] = 2*k1 - 2*k3 + 2*y01
+        t.f[13] = 2*r2 + 2*r3 - 2*r5
+        t.f[14] = 0
+        t.f[15] = 2*a2 + 2*a2*b1 + 2*r1
+
+        var ipiv = [__LAPACK_int](repeating: 0, count: 4)
+        var lwork = __LAPACK_int(16)
+        var work = [Double](repeating: 0, count: Int(lwork))
+        var error: __LAPACK_int = 0
+        var n_lapack = __LAPACK_int(4)
+
+        dgetrf_(&n_lapack, &n_lapack, &t.f, &n_lapack, &ipiv, &error)
+        dgetri_(&n_lapack, &t.f, &n_lapack, &ipiv, &work, &lwork, &error)
+
+        vDSP_vsmulD(t.f, 1, [-1.0], &t.f, 1, 16)
+
+        // set up C matrix
+        t.c[0] = 2*k2
+        t.c[1] = -2*k1
+        t.c[2] = 2*(-1-k5)
+        t.c[3] = 2*k3
+        t.c[4] = 2*a
+        t.c[5] = -2*y01
+
+        t.c[6] = 2*k1
+        t.c[7] = 2*k2
+        t.c[8] = -2*k3
+        t.c[9] = 2*(-1-k5)
+        t.c[10] = 2*y01
+        t.c[11] = 2*a
+
+        t.c[12] = 2*(-1-k2)
+        t.c[13] = 2*k1
+        t.c[14] = 2*k5
+        t.c[15] = 2*r6
+        t.c[16] = -2*x01
+        t.c[17] = 2*y01
+
+        t.c[18] = 2*k1
+        t.c[19] = 2*(-1-k2)
+        t.c[20] = -2*k3
+        t.c[21] = 2*k5
+        t.c[22] = -2*y01
+        t.c[23] = -2*x01
+
+        triangles[nTriangle] = t
     }
     
     private func precomputeFittingMatrices() {

@@ -182,6 +182,16 @@ class RigidMeshDeformer2D {
         setupValid = true
     }
     
+    private func extractSubMatrix(from matrix: [Double], rows: Int, cols: Int, rowOffset: Int, colOffset: Int, subRows: Int, subCols: Int) -> [Double] {
+        var subMatrix = [Double](repeating: 0.0, count: subRows * subCols)
+        for i in 0..<subRows {
+            for j in 0..<subCols {
+                subMatrix[i * subCols + j] = matrix[(i + rowOffset) * cols + (j + colOffset)]
+            }
+        }
+        return subMatrix
+    }
+
     private func precomputeOrientationMatrix() {
         let constraintsVec = constraints.sorted()
         let nVerts = deformedVerts.count
@@ -250,27 +260,9 @@ class RigidMeshDeformer2D {
         let freeSize = 2 * nFreeVerts
         let constSize = 2 * nConstraints
 
-        var g00 = [Double](repeating: 0.0, count: freeSize * freeSize)
-        var g01 = [Double](repeating: 0.0, count: freeSize * constSize)
-        var g10 = [Double](repeating: 0.0, count: constSize * freeSize)
-
-        for i in 0..<freeSize {
-            for j in 0..<freeSize {
-                g00[i * freeSize + j] = firstMatrix[i * matrixSize + j]
-            }
-        }
-
-        for i in 0..<freeSize {
-            for j in 0..<constSize {
-                g01[i * constSize + j] = firstMatrix[i * matrixSize + (j + freeSize)]
-            }
-        }
-
-        for i in 0..<constSize {
-            for j in 0..<freeSize {
-                g10[i * freeSize + j] = firstMatrix[(i + freeSize) * matrixSize + j]
-            }
-        }
+        let g00 = extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: 0, colOffset: 0, subRows: freeSize, subCols: freeSize)
+        let g01 = extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: 0, colOffset: freeSize, subRows: freeSize, subCols: constSize)
+        let g10 = extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: freeSize, colOffset: 0, subRows: constSize, subCols: freeSize)
 
         var gPrime = g00
         for i in 0..<freeSize {
@@ -454,23 +446,11 @@ class RigidMeshDeformer2D {
             }
         }
 
-        var hX00 = [Double](repeating: 0.0, count: nFreeVerts * nFreeVerts)
-        var hY00 = [Double](repeating: 0.0, count: nFreeVerts * nFreeVerts)
-        for i in 0..<nFreeVerts {
-            for j in 0..<nFreeVerts {
-                hX00[i * nFreeVerts + j] = hX[i * nVerts + j]
-                hY00[i * nFreeVerts + j] = hY[i * nVerts + j]
-            }
-        }
+        let hX00 = extractSubMatrix(from: hX, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: 0, subRows: nFreeVerts, subCols: nFreeVerts)
+        let hY00 = extractSubMatrix(from: hY, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: 0, subRows: nFreeVerts, subCols: nFreeVerts)
 
-        var hX01 = [Double](repeating: 0.0, count: nFreeVerts * nConstraints)
-        var hY01 = [Double](repeating: 0.0, count: nFreeVerts * nConstraints)
-        for i in 0..<nFreeVerts {
-            for j in 0..<nConstraints {
-                hX01[i * nConstraints + j] = hX[i * nVerts + (j + nFreeVerts)]
-                hY01[i * nConstraints + j] = hY[i * nVerts + (j + nFreeVerts)]
-            }
-        }
+        let hX01 = extractSubMatrix(from: hX, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: nFreeVerts, subRows: nFreeVerts, subCols: nConstraints)
+        let hY01 = extractSubMatrix(from: hY, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: nFreeVerts, subRows: nFreeVerts, subCols: nConstraints)
 
         hxPrime = hX00
         hyPrime = hY00

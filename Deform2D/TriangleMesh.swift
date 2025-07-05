@@ -25,6 +25,14 @@ class TriangleMesh {
         self.filename = filename
         self.initialize(vertexSizeHint: vertexSizeHint, triangleSizeHint: triangleSizeHint)
     }
+    
+    public func flipVertical() {
+        for i in 0 ..< self.vertices.count {
+            var vertex = self.vertices[i]
+            vertex.y = -vertex.y
+            self.vertices[i] = vertex
+        }
+    }
 
     private func initialize(vertexSizeHint: Int, triangleSizeHint: Int) {
         if vertexSizeHint > 0 {
@@ -92,10 +100,67 @@ class TriangleMesh {
         return VertexIndex(newID)
     }
 
+    @discardableResult
+    func appendNormal(normal: SIMD3<Float>) -> VertexIndex {
+        let newID = self.normals.count
+        self.normals.append(normal)
+        return VertexIndex(newID)
+    }
+
     func setVertex(i: VertexIndex, v: SIMD3<Float>) {
         if i < self.vertices.count {
             self.vertices[i] = v
         }
+    }
+
+    convenience init?(fileURL: URL) {
+        self.init()
+        guard read(from: fileURL) else { return nil }
+    }
+
+    func read(from url: URL) -> Bool {
+        guard let content = try? String(contentsOf: url) else {
+            fileError = "Cannot open file \(url.path)"
+            return false
+        }
+
+        let lines = content.split(separator: "\n")
+        var tempNormals: [SIMD3<Float>] = []
+
+        for line in lines {
+            let components = line.split(separator: " ")
+            guard let command = components.first else { continue }
+
+            switch command {
+            case "v":
+                guard components.count >= 4,
+                      let x = Float(components[1]),
+                      let y = Float(components[2]),
+                      let z = Float(components[3]) else { continue }
+                appendVertex(vertex: SIMD3<Float>(x, y, z))
+            case "vn":
+                guard components.count >= 4,
+                      let x = Float(components[1]),
+                      let y = Float(components[2]),
+                      let z = Float(components[3]) else { continue }
+                tempNormals.append(normalize(SIMD3<Float>(x, y, z)))
+            case "f":
+                guard components.count >= 4 else { continue }
+                var vertexIndices: [VertexIndex] = []
+                for i in 1..<4 {
+                    let faceComponents = components[i].split(separator: "/")
+                    if let vIndex = Int(faceComponents[0]) {
+                        vertexIndices.append(vIndex - 1)
+                    }
+                }
+                if vertexIndices.count == 3 {
+                    appendTriangle(v1: vertexIndices[0], v2: vertexIndices[1], v3: vertexIndices[2])
+                }
+            default:
+                break
+            }
+        }
+        return true
     }
 
     private func getTriangleIndices(triangleIndex: TriangleIndex) -> [VertexIndex] {

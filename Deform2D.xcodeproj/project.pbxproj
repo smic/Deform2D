@@ -11,6 +11,16 @@
 		D49285C62E19117200F5DAF4 /* GEMINI.md */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = GEMINI.md; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		D49285D52E19AEFB00F5DAF4 /* Exceptions for "Deform2D-Original" folder in "Deform2D" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				man.obj,
+			);
+			target = D49278B92E19107E00F5DAF4 /* Deform2D */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		D49278BC2E19107E00F5DAF4 /* Deform2D */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
@@ -19,6 +29,9 @@
 		};
 		D49285C52E1910E000F5DAF4 /* Deform2D-Original */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				D49285D52E19AEFB00F5DAF4 /* Exceptions for "Deform2D-Original" folder in "Deform2D" target */,
+			);
 			path = "Deform2D-Original";
 			sourceTree = "<group>";
 		};

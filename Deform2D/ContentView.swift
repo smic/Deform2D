@@ -35,7 +35,8 @@ struct ContentView: View {
                     path.addLine(to: CGPoint(x: CGFloat(v2.x), y: CGFloat(v2.y)))
                     path.addLine(to: CGPoint(x: CGFloat(v3.x), y: CGFloat(v3.y)))
                     path.closeSubpath()
-                    context.stroke(path, with: .color(.black), lineWidth: 2)
+                    context.fill(path, with: .color(Color("FillColor")))
+                    context.stroke(path, with: .color(Color("StrokeColor")), style: .init(lineWidth: 1, lineCap: .round, lineJoin: .round))
                 }
 
                 print("self.viewModel.selectedVertices:", self.viewModel.selectedVertices)
@@ -43,9 +44,20 @@ struct ContentView: View {
                     var v = SIMD3<Float>()
                     var n: SIMD3<Float>?
                     self.viewModel.deformedMesh.getVertex(vertexIndex: selected, vertex: &v, normal: &n)
-                    let viewPos = SIMD2<Float>(v.x, v.y) * Float(scale) + translate
-                    let rect = CGRect(x: CGFloat(viewPos.x - 5), y: CGFloat(viewPos.y - 5), width: 10, height: 10)
-                    context.fill(Path(rect), with: .color(.red))
+                    let point = SIMD2<Float>(v.x, v.y) * Float(scale) + translate
+                    let handleRadius: CGFloat = 3.5
+                    let handleRect = CGRect(x: CGFloat(point.x) - handleRadius, y: CGFloat(point.y) - handleRadius, width: handleRadius * 2, height: handleRadius * 2)
+                    let handlePath = Path(ellipseIn: handleRect)
+                    
+//                    if index == selectedPointIndex {
+//                        context.fill(handlePath, with: .color(.yellow))
+//                    } else {
+                        context.fill(handlePath, with: .color(.red))
+//                    }
+                    context.stroke(handlePath, with: .color(.black), lineWidth: 1)
+                    
+                    
+//                    context.fill(Path(rect), with: .color(.red))
                 }
             }
             .gesture(

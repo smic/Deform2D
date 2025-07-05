@@ -17,36 +17,43 @@ final class DeformationViewModel {
     private var selectedVertex: TriangleMesh.VertexIndex? = nil
 
     init() {
-        let mesh = TriangleMesh()
-        // Manually create a square mesh for now
-        let nRowLen: Int = 5
-        let fYStep: Float = 2.0 / Float(nRowLen - 1)
-        let fXStep: Float = 2.0 / Float(nRowLen - 1)
+        if let url = Bundle.main.url(forResource: "man", withExtension: "obj"),
+           let mesh = TriangleMesh(fileURL: url) {
+            mesh.flipVertical()
+            self.initialMesh = mesh
+            self.deformedMesh = mesh
+        } else {
+            let mesh = TriangleMesh()
+            // Manually create a square mesh for now
+            let nRowLen: UInt32 = 5
+            let fYStep: Float = 2.0 / Float(nRowLen - 1)
+            let fXStep: Float = 2.0 / Float(nRowLen - 1)
 
-        for yi in 0 ..< nRowLen {
-            let fY = -1.0 + Float(yi) * fYStep
-            for xi in 0 ..< nRowLen {
-                let fX = -1.0 + Float(xi) * fXStep
-                mesh.appendVertex(vertex: SIMD3<Float>(fX, fY, 0))
+            for yi in 0..<nRowLen {
+                let fY = -1.0 + Float(yi) * fYStep
+                for xi in 0..<nRowLen {
+                    let fX = -1.0 + Float(xi) * fXStep
+                    mesh.appendVertex(vertex: SIMD3<Float>(fX, fY, 0))
+                }
             }
-        }
 
-        for yi in 0 ..< (nRowLen - 1) {
-            let nRow1 = yi * nRowLen
-            let nRow2 = (yi + 1) * nRowLen
+            for yi in 0..<(nRowLen - 1) {
+                let nRow1 = yi * nRowLen
+                let nRow2 = (yi + 1) * nRowLen
 
-            for xi in 0 ..< (nRowLen - 1) {
-                let nTri1: [TriangleMesh.VertexIndex] = [nRow1 + xi, nRow2 + xi + 1, nRow1 + xi + 1]
-                let nTri2: [TriangleMesh.VertexIndex] = [nRow1 + xi, nRow2 + xi, nRow2 + xi + 1]
-                mesh.appendTriangle(v1: nTri1[0], v2: nTri1[1], v3: nTri1[2])
-                mesh.appendTriangle(v1: nTri2[0], v2: nTri2[1], v3: nTri2[2])
+                for xi in 0..<(nRowLen - 1) {
+                    let nTri1: [UInt32] = [nRow1 + xi, nRow2 + xi + 1, nRow1 + xi + 1]
+                    let nTri2: [UInt32] = [nRow1 + xi, nRow2 + xi, nRow2 + xi + 1]
+                    mesh.appendTriangle(v1: Int(nTri1[0]), v2: Int(nTri1[1]), v3: Int(nTri1[2]))
+                    mesh.appendTriangle(v1: Int(nTri2[0]), v2: Int(nTri2[1]), v3: Int(nTri2[2]))
+                }
             }
+            self.initialMesh = mesh
+            self.deformedMesh = mesh
         }
         
-        self.initialMesh = mesh
-        self.deformedMesh = mesh
-        self.deformer.initializeFromMesh(mesh: self.initialMesh)
-        self.invalidateConstraints()
+        self.deformer.initializeFromMesh(mesh: initialMesh)
+        invalidateConstraints()
     }
 
     func updateDeformedMesh() {

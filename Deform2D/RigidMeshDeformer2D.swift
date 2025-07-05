@@ -5,7 +5,7 @@ import Accelerate
 
 typealias Vector2f = SIMD2<Float>
 typealias Vector3f = SIMD3<Float>
-typealias Matrix = simd_float4x4
+//typealias Matrix = simd_float4x4
 
 class RigidMeshDeformer2D {
     
@@ -14,15 +14,15 @@ class RigidMeshDeformer2D {
     }
     
     struct Triangle {
-        var verts: [UInt32] = [0,0,0]
-        var triCoords: [Vector2f] = [Vector2f.zero, Vector2f.zero, Vector2f.zero]
-        var scaled: [Vector2f] = [Vector2f.zero, Vector2f.zero, Vector2f.zero]
+        var verts: [Int] = [0,0,0]
+        var triCoords: [Vector2f] = [.zero, .zero, .zero]
+        var scaled: [Vector2f] = [.zero, .zero, .zero]
         var f: [Double] = []
         var c: [Double] = []
     }
     
     struct Constraint: Comparable, Hashable {
-        var vertex: UInt32
+        var vertex: Int
         var constrainedPos: Vector2f
         
         static func < (lhs: RigidMeshDeformer2D.Constraint, rhs: RigidMeshDeformer2D.Constraint) -> Bool {
@@ -60,14 +60,14 @@ class RigidMeshDeformer2D {
         validateSetup()
     }
     
-    func removeHandle(handle: UInt32) {
+    func removeHandle(handle: Int) {
         let c = Constraint(vertex: handle, constrainedPos: Vector2f.zero)
         constraints.remove(c)
         deformedVerts[Int(handle)].position = initialVerts[Int(handle)].position
         invalidateSetup()
     }
     
-    func setDeformedHandle(handle: UInt32, pos: Vector2f) {
+    func setDeformedHandle(handle: Int, pos: Vector2f) {
         let c = Constraint(vertex: handle, constrainedPos: pos)
         updateConstraint(cons: c)
     }
@@ -109,7 +109,7 @@ class RigidMeshDeformer2D {
         let nTris = mesh.getNumTriangles()
         for i in 0..<nTris {
             var t = Triangle()
-            var verts: [UInt32] = [0,0,0]
+            var verts: [Int] = [0,0,0]
             mesh.getTriangle(i: i, v: &verts)
             t.verts = verts
             triangles.append(t)
@@ -201,7 +201,7 @@ class RigidMeshDeformer2D {
         vertexMap = [Int](repeating: 0, count: nVerts)
         var nRow = 0
         for i in 0..<nVerts {
-            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            let c = Constraint(vertex: i, constrainedPos: .zero)
             if !constraints.contains(c) {
                 vertexMap[i] = nRow
                 nRow += 1
@@ -299,9 +299,9 @@ class RigidMeshDeformer2D {
         var finalMatrix = [Double](repeating: 0.0, count: freeSize * constSize)
         let alpha = -1.0
         let beta = 0.0
-        let M = Int32(freeSize)
-        let N = Int32(constSize)
-        let K = Int32(freeSize)
+        let M = __LAPACK_int(freeSize)
+        let N = __LAPACK_int(constSize)
+        let K = __LAPACK_int(freeSize)
 
         cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans, M, N, K, alpha, &gPrime, K, &b, N, beta, &finalMatrix, N)
 
@@ -414,7 +414,7 @@ class RigidMeshDeformer2D {
         vertexMap = [Int](repeating: 0, count: nVerts)
         var nRow = 0
         for i in 0..<nVerts {
-            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            let c = Constraint(vertex: i, constrainedPos: .zero)
             if !constraints.contains(c) {
                 vertexMap[i] = nRow
                 nRow += 1
@@ -496,10 +496,10 @@ class RigidMeshDeformer2D {
         let constSize = 2 * nConstraints
         var vU = [Double](repeating: 0.0, count: freeSize)
 
-        cblas_dgemv(CblasRowMajor, CblasNoTrans, Int32(freeSize), Int32(constSize), 1.0, firstMatrix, Int32(constSize), vQ, 1, 0.0, &vU, 1)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(freeSize), __LAPACK_int(constSize), 1.0, firstMatrix, __LAPACK_int(constSize), vQ, 1, 0.0, &vU, 1)
 
         for i in 0..<nVerts {
-            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            let c = Constraint(vertex: i, constrainedPos: .zero)
             if !constraints.contains(c) {
                 let nRow = vertexMap[i]
                 let fX = vU[2 * nRow]
@@ -522,9 +522,11 @@ class RigidMeshDeformer2D {
         let vDeformedV0 = deformedVerts[Int(t.verts[0])].position
         let vDeformedV1 = deformedVerts[Int(t.verts[1])].position
         let vDeformedV2 = deformedVerts[Int(t.verts[2])].position
-        let vDeformed: [Double] = [Double(vDeformedV0.x), Double(vDeformedV0.y),
-                                   Double(vDeformedV1.x), Double(vDeformedV1.y),
-                                   Double(vDeformedV2.x), Double(vDeformedV2.y)]
+        let vDeformed: [Double] = [
+            Double(vDeformedV0.x), Double(vDeformedV0.y),
+            Double(vDeformedV1.x), Double(vDeformedV1.y),
+            Double(vDeformedV2.x), Double(vDeformedV2.y)
+        ]
 
         var mCVec = [Double](repeating: 0.0, count: 4)
         cblas_dgemv(CblasRowMajor, CblasNoTrans, 4, 6, 1.0, t.c, 6, vDeformed, 1, 0.0, &mCVec, 1)
@@ -593,12 +595,12 @@ class RigidMeshDeformer2D {
         }
 
         var rhsX = [Double](repeating: 0.0, count: nFreeVerts)
-        cblas_dgemv(CblasRowMajor, CblasNoTrans, Int32(nFreeVerts), Int32(nConstraints), 1.0, dx, Int32(nConstraints), vQX, 1, 0.0, &rhsX, 1)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(nFreeVerts), __LAPACK_int(nConstraints), 1.0, dx, __LAPACK_int(nConstraints), vQX, 1, 0.0, &rhsX, 1)
         vDSP_vaddD(rhsX, 1, vF0X, 1, &rhsX, 1, vDSP_Length(nFreeVerts))
         vDSP_vnegD(rhsX, 1, &rhsX, 1, vDSP_Length(nFreeVerts))
 
         var rhsY = [Double](repeating: 0.0, count: nFreeVerts)
-        cblas_dgemv(CblasRowMajor, CblasNoTrans, Int32(nFreeVerts), Int32(nConstraints), 1.0, dy, Int32(nConstraints), vQY, 1, 0.0, &rhsY, 1)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(nFreeVerts), __LAPACK_int(nConstraints), 1.0, dy, __LAPACK_int(nConstraints), vQY, 1, 0.0, &rhsY, 1)
         vDSP_vaddD(rhsY, 1, vF0Y, 1, &rhsY, 1, vDSP_Length(nFreeVerts))
         vDSP_vnegD(rhsY, 1, &rhsY, 1, vDSP_Length(nFreeVerts))
 
@@ -617,7 +619,7 @@ class RigidMeshDeformer2D {
         dgetrs_("N".cString(using: .utf8)!, &n_lapack, &nrhs, &luMatrixY, &n_lapack, &pivotY, &solY, &n_lapack, &error)
 
         for i in 0..<nVerts {
-            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            let c = Constraint(vertex: i, constrainedPos: .zero)
             if !constraints.contains(c) {
                 let row = vertexMap[i]
                 deformedVerts[i].position.x = Float(solX[row])
@@ -626,7 +628,7 @@ class RigidMeshDeformer2D {
         }
     }
     
-    private func getInitialVert(nVert: UInt32) -> Vector2f {
+    private func getInitialVert(nVert: Int) -> Vector2f {
         return initialVerts[Int(nVert)].position
     }
     
@@ -652,6 +654,6 @@ class TriangleMesh {
     func getNumVertices() -> Int { return 0 }
     func getNumTriangles() -> Int { return 0 }
     func getVertex(i: Int, v: inout Vector3f) {}
-    func getTriangle(i: Int, v: inout [UInt32]) {}
+    func getTriangle(i: Int, v: inout [Int]) {}
     func setVertex(i: Int, v: Vector3f) {}
 }

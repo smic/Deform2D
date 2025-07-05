@@ -5,16 +5,8 @@ import simd
 @Observable
 final class DeformationViewModel {
     @ObservationIgnored
-    var deformedMesh: TriangleMesh {
-        didSet {
-            print("did set deformedMesh")
-        }
-    }
-    var selectedVertices: Set<TriangleMesh.VertexIndex> = [] {
-        didSet {
-            print("did set selectedVertices:", self.selectedVertices)
-        }
-    }
+    var deformedMesh: TriangleMesh
+    var selectedVertices: Set<TriangleMesh.VertexIndex> = []
 
     @ObservationIgnored
     private var deformer = RigidMeshDeformer2D()
@@ -22,12 +14,7 @@ final class DeformationViewModel {
     private var initialMesh: TriangleMesh
     @ObservationIgnored
     private var constraintsValid: Bool = false
-    private var selectedVertex: TriangleMesh.VertexIndex? = nil  {
-        didSet {
-            print("did set selectedVertex:", self.selectedVertex)
-        }
-    }
-    
+    private var selectedVertex: TriangleMesh.VertexIndex? = nil
 
     init() {
         let mesh = TriangleMesh()

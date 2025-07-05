@@ -1,20 +1,19 @@
 
+import Accelerate
 import Foundation
 import simd
-import Accelerate
 
 typealias Vector2f = SIMD2<Float>
 typealias Vector3f = SIMD3<Float>
-//typealias Matrix = simd_float4x4
+// typealias Matrix = simd_float4x4
 
 class RigidMeshDeformer2D {
-    
     struct Vertex {
         var position: Vector2f
     }
     
     struct Triangle {
-        var verts: [Int] = [0,0,0]
+        var verts: [Int] = [0, 0, 0]
         var triCoords: [Vector2f] = [.zero, .zero, .zero]
         var scaled: [Vector2f] = [.zero, .zero, .zero]
         var f: [Double] = []
@@ -51,80 +50,79 @@ class RigidMeshDeformer2D {
     private var luDecompX: LUDecomposition?
     private var luDecompY: LUDecomposition?
     
-    
     init() {
-        invalidateSetup()
+        self.invalidateSetup()
     }
     
     func forceValidation() {
-        validateSetup()
+        self.validateSetup()
     }
     
     func removeHandle(handle: Int) {
         let c = Constraint(vertex: handle, constrainedPos: Vector2f.zero)
-        constraints.remove(c)
-        deformedVerts[Int(handle)].position = initialVerts[Int(handle)].position
-        invalidateSetup()
+        self.constraints.remove(c)
+        self.deformedVerts[Int(handle)].position = self.initialVerts[Int(handle)].position
+        self.invalidateSetup()
     }
     
     func setDeformedHandle(handle: Int, pos: Vector2f) {
         let c = Constraint(vertex: handle, constrainedPos: pos)
-        updateConstraint(cons: c)
+        self.updateConstraint(cons: c)
     }
     
     func unTransformPoint(transform: inout Vector2f) {
-        for i in 0..<triangles.count {
-            let v1 = deformedVerts[Int(triangles[i].verts[0])].position
-            let v2 = deformedVerts[Int(triangles[i].verts[1])].position
-            let v3 = deformedVerts[Int(triangles[i].verts[2])].position
+        for i in 0 ..< self.triangles.count {
+            let v1 = self.deformedVerts[Int(self.triangles[i].verts[0])].position
+            let v2 = self.deformedVerts[Int(self.triangles[i].verts[1])].position
+            let v3 = self.deformedVerts[Int(self.triangles[i].verts[2])].position
             
-            let barycentric = barycentricCoords(p: transform, a: v1, b: v2, c: v3)
+            let barycentric = self.barycentricCoords(p: transform, a: v1, b: v2, c: v3)
             if barycentric.x < 0 || barycentric.x > 1 || barycentric.y < 0 || barycentric.y > 1 || barycentric.z < 0 || barycentric.z > 1 {
                 continue
             }
             
-            let v1Init = initialVerts[Int(triangles[i].verts[0])].position
-            let v2Init = initialVerts[Int(triangles[i].verts[1])].position
-            let v3Init = initialVerts[Int(triangles[i].verts[2])].position
+            let v1Init = self.initialVerts[Int(self.triangles[i].verts[0])].position
+            let v2Init = self.initialVerts[Int(self.triangles[i].verts[1])].position
+            let v3Init = self.initialVerts[Int(self.triangles[i].verts[2])].position
             transform = barycentric.x * v1Init + barycentric.y * v2Init + barycentric.z * v3Init
             return
         }
     }
     
     func initializeFromMesh(mesh: TriangleMesh) {
-        constraints.removeAll()
-        initialVerts.removeAll()
-        deformedVerts.removeAll()
-        triangles.removeAll()
+        self.constraints.removeAll()
+        self.initialVerts.removeAll()
+        self.deformedVerts.removeAll()
+        self.triangles.removeAll()
         
         let nVerts = mesh.getNumVertices()
-        for i in 0..<nVerts {
-            var vertex: Vector3f = Vector3f.zero
+        for i in 0 ..< nVerts {
+            var vertex: Vector3f = .zero
             mesh.getVertex(i: i, v: &vertex)
             let v = Vertex(position: Vector2f(vertex.x, vertex.y))
-            initialVerts.append(v)
-            deformedVerts.append(v)
+            self.initialVerts.append(v)
+            self.deformedVerts.append(v)
         }
         
         let nTris = mesh.getNumTriangles()
-        for i in 0..<nTris {
+        for i in 0 ..< nTris {
             var t = Triangle()
-            var verts: [Int] = [0,0,0]
+            var verts: [Int] = [0, 0, 0]
             mesh.getTriangle(i: i, v: &verts)
             t.verts = verts
-            triangles.append(t)
+            self.triangles.append(t)
         }
         
-        for i in 0..<nTris {
-            var t = triangles[i]
-            for j in 0..<3 {
+        for i in 0 ..< nTris {
+            var t = self.triangles[i]
+            for j in 0 ..< 3 {
                 let n0 = j
-                let n1 = (j+1)%3
-                let n2 = (j+2)%3
+                let n1 = (j + 1) % 3
+                let n2 = (j + 2) % 3
                 
-                let v0 = getInitialVert(nVert: t.verts[n0])
-                let v1 = getInitialVert(nVert: t.verts[n1])
-                let v2 = getInitialVert(nVert: t.verts[n2])
+                let v0 = self.getInitialVert(nVert: t.verts[n0])
+                let v1 = self.getInitialVert(nVert: t.verts[n1])
+                let v2 = self.getInitialVert(nVert: t.verts[n2])
                 
                 let v01 = v1 - v0
                 let v01N = normalize(v01)
@@ -136,56 +134,56 @@ class RigidMeshDeformer2D {
                 
                 t.triCoords[j] = Vector2f(fX, fY)
             }
-            triangles[i] = t
+            self.triangles[i] = t
         }
     }
     
     func updateDeformedMesh(mesh: inout TriangleMesh, rigid: Bool) {
-        validateDeformedMesh(rigid: rigid)
+        self.validateDeformedMesh(rigid: rigid)
         
-        let useVerts = constraints.count > 1 ? deformedVerts : initialVerts
+        let useVerts = self.constraints.count > 1 ? self.deformedVerts : self.initialVerts
         
         let nVerts = mesh.getNumVertices()
-        for i in 0..<nVerts {
+        for i in 0 ..< nVerts {
             let newPos = useVerts[Int(i)].position
             mesh.setVertex(i: i, v: Vector3f(newPos.x, newPos.y, 0.0))
         }
     }
     
     private func updateConstraint(cons: Constraint) {
-        if constraints.contains(cons) {
-            constraints.update(with: cons)
+        if self.constraints.contains(cons) {
+            self.constraints.update(with: cons)
         } else {
-            constraints.insert(cons)
+            self.constraints.insert(cons)
         }
-        deformedVerts[Int(cons.vertex)].position = cons.constrainedPos
-        invalidateSetup()
+        self.deformedVerts[Int(cons.vertex)].position = cons.constrainedPos
+        self.invalidateSetup()
     }
     
     private func invalidateSetup() {
-        setupValid = false
+        self.setupValid = false
     }
     
     private func validateSetup() {
-        if setupValid || constraints.count < 2 {
+        if self.setupValid || self.constraints.count < 2 {
             return
         }
         
-        precomputeOrientationMatrix()
+        self.precomputeOrientationMatrix()
         
-        for i in 0..<triangles.count {
-            precomputeScalingMatrices(nTriangle: i)
+        for i in 0 ..< self.triangles.count {
+            self.precomputeScalingMatrices(nTriangle: i)
         }
         
-        precomputeFittingMatrices()
+        self.precomputeFittingMatrices()
         
-        setupValid = true
+        self.setupValid = true
     }
     
     private func extractSubMatrix(from matrix: [Double], rows: Int, cols: Int, rowOffset: Int, colOffset: Int, subRows: Int, subCols: Int) -> [Double] {
         var subMatrix = [Double](repeating: 0.0, count: subRows * subCols)
-        for i in 0..<subRows {
-            for j in 0..<subCols {
+        for i in 0 ..< subRows {
+            for j in 0 ..< subCols {
                 subMatrix[i * subCols + j] = matrix[(i + rowOffset) * cols + (j + colOffset)]
             }
         }
@@ -193,63 +191,63 @@ class RigidMeshDeformer2D {
     }
 
     private func precomputeOrientationMatrix() {
-        let constraintsVec = constraints.sorted()
-        let nVerts = deformedVerts.count
+        let constraintsVec = self.constraints.sorted()
+        let nVerts = self.deformedVerts.count
         let nConstraints = constraintsVec.count
         let nFreeVerts = nVerts - nConstraints
 
-        vertexMap = [Int](repeating: 0, count: nVerts)
+        self.vertexMap = [Int](repeating: 0, count: nVerts)
         var nRow = 0
-        for i in 0..<nVerts {
+        for i in 0 ..< nVerts {
             let c = Constraint(vertex: i, constrainedPos: .zero)
-            if !constraints.contains(c) {
-                vertexMap[i] = nRow
+            if !self.constraints.contains(c) {
+                self.vertexMap[i] = nRow
                 nRow += 1
             }
         }
-        for i in 0..<nConstraints {
-            vertexMap[Int(constraintsVec[i].vertex)] = nRow
+        for i in 0 ..< nConstraints {
+            self.vertexMap[Int(constraintsVec[i].vertex)] = nRow
             nRow += 1
         }
 
         let matrixSize = 2 * nVerts
         var firstMatrix = [Double](repeating: 0.0, count: matrixSize * matrixSize)
 
-        for i in 0..<triangles.count {
-            let t = triangles[i]
-            for j in 0..<3 {
-                let n0x = 2 * vertexMap[Int(t.verts[j])]
+        for i in 0 ..< self.triangles.count {
+            let t = self.triangles[i]
+            for j in 0 ..< 3 {
+                let n0x = 2 * self.vertexMap[Int(t.verts[j])]
                 let n0y = n0x + 1
-                let n1x = 2 * vertexMap[Int(t.verts[(j + 1) % 3])]
+                let n1x = 2 * self.vertexMap[Int(t.verts[(j + 1) % 3])]
                 let n1y = n1x + 1
-                let n2x = 2 * vertexMap[Int(t.verts[(j + 2) % 3])]
+                let n2x = 2 * self.vertexMap[Int(t.verts[(j + 2) % 3])]
                 let n2y = n2x + 1
                 let x = Double(t.triCoords[j].x)
                 let y = Double(t.triCoords[j].y)
 
                 // n0x,n?? elems
-                firstMatrix[n0x * matrixSize + n0x] += 1 - 2*x + x*x + y*y
-                firstMatrix[n0x * matrixSize + n1x] += 2*x - 2*x*x - 2*y*y
-                firstMatrix[n0x * matrixSize + n1y] += 2*y
-                firstMatrix[n0x * matrixSize + n2x] += -2 + 2*x
+                firstMatrix[n0x * matrixSize + n0x] += 1 - 2 * x + x * x + y * y
+                firstMatrix[n0x * matrixSize + n1x] += 2 * x - 2 * x * x - 2 * y * y
+                firstMatrix[n0x * matrixSize + n1y] += 2 * y
+                firstMatrix[n0x * matrixSize + n2x] += -2 + 2 * x
                 firstMatrix[n0x * matrixSize + n2y] += -2 * y
 
                 // n0y,n?? elems
-                firstMatrix[n0y * matrixSize + n0y] += 1 - 2*x + x*x + y*y
-                firstMatrix[n0y * matrixSize + n1x] += -2*y
-                firstMatrix[n0y * matrixSize + n1y] += 2*x - 2*x*x - 2*y*y
-                firstMatrix[n0y * matrixSize + n2x] += 2*y
-                firstMatrix[n0y * matrixSize + n2y] += -2 + 2*x
+                firstMatrix[n0y * matrixSize + n0y] += 1 - 2 * x + x * x + y * y
+                firstMatrix[n0y * matrixSize + n1x] += -2 * y
+                firstMatrix[n0y * matrixSize + n1y] += 2 * x - 2 * x * x - 2 * y * y
+                firstMatrix[n0y * matrixSize + n2x] += 2 * y
+                firstMatrix[n0y * matrixSize + n2y] += -2 + 2 * x
 
                 // n1x,n?? elems
-                firstMatrix[n1x * matrixSize + n1x] += x*x + y*y
-                firstMatrix[n1x * matrixSize + n2x] += -2*x
-                firstMatrix[n1x * matrixSize + n2y] += 2*y
+                firstMatrix[n1x * matrixSize + n1x] += x * x + y * y
+                firstMatrix[n1x * matrixSize + n2x] += -2 * x
+                firstMatrix[n1x * matrixSize + n2y] += 2 * y
 
-                //n1y,n?? elems
-                firstMatrix[n1y * matrixSize + n1y] += x*x + y*y
-                firstMatrix[n1y * matrixSize + n2x] += -2*y
-                firstMatrix[n1y * matrixSize + n2y] += -2*x
+                // n1y,n?? elems
+                firstMatrix[n1y * matrixSize + n1y] += x * x + y * y
+                firstMatrix[n1y * matrixSize + n2x] += -2 * y
+                firstMatrix[n1y * matrixSize + n2y] += -2 * x
 
                 // final 2 elems
                 firstMatrix[n2x * matrixSize + n2x] += 1
@@ -260,20 +258,20 @@ class RigidMeshDeformer2D {
         let freeSize = 2 * nFreeVerts
         let constSize = 2 * nConstraints
 
-        let g00 = extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: 0, colOffset: 0, subRows: freeSize, subCols: freeSize)
-        let g01 = extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: 0, colOffset: freeSize, subRows: freeSize, subCols: constSize)
-        let g10 = extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: freeSize, colOffset: 0, subRows: constSize, subCols: freeSize)
+        let g00 = self.extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: 0, colOffset: 0, subRows: freeSize, subCols: freeSize)
+        let g01 = self.extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: 0, colOffset: freeSize, subRows: freeSize, subCols: constSize)
+        let g10 = self.extractSubMatrix(from: firstMatrix, rows: matrixSize, cols: matrixSize, rowOffset: freeSize, colOffset: 0, subRows: constSize, subCols: freeSize)
 
         var gPrime = g00
-        for i in 0..<freeSize {
-            for j in 0..<freeSize {
+        for i in 0 ..< freeSize {
+            for j in 0 ..< freeSize {
                 gPrime[i * freeSize + j] += g00[j * freeSize + i]
             }
         }
 
         var b = g01
-        for i in 0..<freeSize {
-            for j in 0..<constSize {
+        for i in 0 ..< freeSize {
+            for j in 0 ..< constSize {
                 b[i * constSize + j] += g10[j * freeSize + i]
             }
         }
@@ -309,7 +307,7 @@ class RigidMeshDeformer2D {
     }
     
     private func precomputeScalingMatrices(nTriangle: Int) {
-        var t = triangles[nTriangle]
+        var t = self.triangles[nTriangle]
 
         t.f = [Double](repeating: 0.0, count: 16)
         t.c = [Double](repeating: 0.0, count: 24)
@@ -321,46 +319,46 @@ class RigidMeshDeformer2D {
         let x20 = Double(t.triCoords[2].x)
         let y20 = Double(t.triCoords[2].y)
 
-        let k1 = x12*y01 + (-1 + x01)*y12
-        let k2 = -x12 + x01*x12 - y01*y12
-        let k3 = -y01 + x20*y01 + x01*y20
-        let k4 = -y01 + x01*y01 + x01*y20
-        let k5 = -x01 + x01*x20 - y01*y20
+        let k1 = x12 * y01 + (-1 + x01) * y12
+        let k2 = -x12 + x01 * x12 - y01 * y12
+        let k3 = -y01 + x20 * y01 + x01 * y20
+        let k4 = -y01 + x01 * y01 + x01 * y20
+        let k5 = -x01 + x01 * x20 - y01 * y20
 
         let a = -1 + x01
-        let a1 = pow(-1 + x01,2) + pow(y01,2)
-        let a2 = pow(x01,2) + pow(y01,2)
-        let b =  -1 + x20
-        let b1 = pow(-1 + x20,2) + pow(y20,2)
-        let c2 = pow(x12,2) + pow(y12,2)
+        let a1 = pow(-1 + x01, 2) + pow(y01, 2)
+        let a2 = pow(x01, 2) + pow(y01, 2)
+        let b = -1 + x20
+        let b1 = pow(-1 + x20, 2) + pow(y20, 2)
+        let c2 = pow(x12, 2) + pow(y12, 2)
 
-        let r1 = 1 + 2*a*x12 + a1*pow(x12,2) - 2*y01*y12 + a1*pow(y12,2)
-        let r2 = -(b*x01) - b1*pow(x01,2) + y01*(-(b1*y01) + y20)
-        let r3 = -(a*x12) - a1*pow(x12,2) + y12*(y01 - a1*y12)
-        let r5 = a*x01 + pow(y01,2)
-        let r6 = -(b*y01) - x01*y20
-        let r7 = 1 + 2*b*x01 + b1*pow(x01,2) + b1*pow(y01,2) - 2*y01*y20
+        let r1 = 1 + 2 * a * x12 + a1 * pow(x12, 2) - 2 * y01 * y12 + a1 * pow(y12, 2)
+        let r2 = -(b * x01) - b1 * pow(x01, 2) + y01 * (-(b1 * y01) + y20)
+        let r3 = -(a * x12) - a1 * pow(x12, 2) + y12 * (y01 - a1 * y12)
+        let r5 = a * x01 + pow(y01, 2)
+        let r6 = -(b * y01) - x01 * y20
+        let r7 = 1 + 2 * b * x01 + b1 * pow(x01, 2) + b1 * pow(y01, 2) - 2 * y01 * y20
 
         //  set up F matrix
-        t.f[0] = 2*a1 + 2*a1*c2 + 2*r7
+        t.f[0] = 2 * a1 + 2 * a1 * c2 + 2 * r7
         t.f[1] = 0
-        t.f[2] = 2*r2 + 2*r3 - 2*r5
-        t.f[3] = 2*k1 + 2*r6 + 2*y01
+        t.f[2] = 2 * r2 + 2 * r3 - 2 * r5
+        t.f[3] = 2 * k1 + 2 * r6 + 2 * y01
 
         t.f[4] = 0
-        t.f[5] = 2*a1 + 2*a1*c2 + 2*r7
-        t.f[6] = -2*k1 + 2*k3 - 2*y01
-        t.f[7] = 2*r2 + 2*r3 - 2*r5
+        t.f[5] = 2 * a1 + 2 * a1 * c2 + 2 * r7
+        t.f[6] = -2 * k1 + 2 * k3 - 2 * y01
+        t.f[7] = 2 * r2 + 2 * r3 - 2 * r5
 
-        t.f[8] = 2*r2 + 2*r3 - 2*r5
-        t.f[9] = -2*k1 + 2*k3 - 2*y01
-        t.f[10] = 2*a2 + 2*a2*b1 + 2*r1
+        t.f[8] = 2 * r2 + 2 * r3 - 2 * r5
+        t.f[9] = -2 * k1 + 2 * k3 - 2 * y01
+        t.f[10] = 2 * a2 + 2 * a2 * b1 + 2 * r1
         t.f[11] = 0
 
-        t.f[12] = 2*k1 - 2*k3 + 2*y01
-        t.f[13] = 2*r2 + 2*r3 - 2*r5
+        t.f[12] = 2 * k1 - 2 * k3 + 2 * y01
+        t.f[13] = 2 * r2 + 2 * r3 - 2 * r5
         t.f[14] = 0
-        t.f[15] = 2*a2 + 2*a2*b1 + 2*r1
+        t.f[15] = 2 * a2 + 2 * a2 * b1 + 2 * r1
 
         var ipiv = [__LAPACK_int](repeating: 0, count: 4)
         var lwork = __LAPACK_int(16)
@@ -374,65 +372,65 @@ class RigidMeshDeformer2D {
         vDSP_vsmulD(t.f, 1, [-1.0], &t.f, 1, 16)
 
         // set up C matrix
-        t.c[0] = 2*k2
-        t.c[1] = -2*k1
-        t.c[2] = 2*(-1-k5)
-        t.c[3] = 2*k3
-        t.c[4] = 2*a
-        t.c[5] = -2*y01
+        t.c[0] = 2 * k2
+        t.c[1] = -2 * k1
+        t.c[2] = 2 * (-1 - k5)
+        t.c[3] = 2 * k3
+        t.c[4] = 2 * a
+        t.c[5] = -2 * y01
 
-        t.c[6] = 2*k1
-        t.c[7] = 2*k2
-        t.c[8] = -2*k3
-        t.c[9] = 2*(-1-k5)
-        t.c[10] = 2*y01
-        t.c[11] = 2*a
+        t.c[6] = 2 * k1
+        t.c[7] = 2 * k2
+        t.c[8] = -2 * k3
+        t.c[9] = 2 * (-1 - k5)
+        t.c[10] = 2 * y01
+        t.c[11] = 2 * a
 
-        t.c[12] = 2*(-1-k2)
-        t.c[13] = 2*k1
-        t.c[14] = 2*k5
-        t.c[15] = 2*r6
-        t.c[16] = -2*x01
-        t.c[17] = 2*y01
+        t.c[12] = 2 * (-1 - k2)
+        t.c[13] = 2 * k1
+        t.c[14] = 2 * k5
+        t.c[15] = 2 * r6
+        t.c[16] = -2 * x01
+        t.c[17] = 2 * y01
 
-        t.c[18] = 2*k1
-        t.c[19] = 2*(-1-k2)
-        t.c[20] = -2*k3
-        t.c[21] = 2*k5
-        t.c[22] = -2*y01
-        t.c[23] = -2*x01
+        t.c[18] = 2 * k1
+        t.c[19] = 2 * (-1 - k2)
+        t.c[20] = -2 * k3
+        t.c[21] = 2 * k5
+        t.c[22] = -2 * y01
+        t.c[23] = -2 * x01
 
-        triangles[nTriangle] = t
+        self.triangles[nTriangle] = t
     }
     
     private func precomputeFittingMatrices() {
-        let constraintsVec = constraints.sorted()
-        let nVerts = deformedVerts.count
+        let constraintsVec = self.constraints.sorted()
+        let nVerts = self.deformedVerts.count
         let nConstraints = constraintsVec.count
         let nFreeVerts = nVerts - nConstraints
 
-        vertexMap = [Int](repeating: 0, count: nVerts)
+        self.vertexMap = [Int](repeating: 0, count: nVerts)
         var nRow = 0
-        for i in 0..<nVerts {
+        for i in 0 ..< nVerts {
             let c = Constraint(vertex: i, constrainedPos: .zero)
-            if !constraints.contains(c) {
-                vertexMap[i] = nRow
+            if !self.constraints.contains(c) {
+                self.vertexMap[i] = nRow
                 nRow += 1
             }
         }
-        for i in 0..<nConstraints {
-            vertexMap[Int(constraintsVec[i].vertex)] = nRow
+        for i in 0 ..< nConstraints {
+            self.vertexMap[Int(constraintsVec[i].vertex)] = nRow
             nRow += 1
         }
 
         var hX = [Double](repeating: 0.0, count: nVerts * nVerts)
         var hY = [Double](repeating: 0.0, count: nVerts * nVerts)
 
-        for i in 0..<triangles.count {
-            let t = triangles[i]
-            for j in 0..<3 {
-                let nA = vertexMap[Int(t.verts[j])]
-                let nB = vertexMap[Int(t.verts[(j + 1) % 3])]
+        for i in 0 ..< self.triangles.count {
+            let t = self.triangles[i]
+            for j in 0 ..< 3 {
+                let nA = self.vertexMap[Int(t.verts[j])]
+                let nB = self.vertexMap[Int(t.verts[(j + 1) % 3])]
 
                 hX[nA * nVerts + nA] += 2
                 hX[nA * nVerts + nB] += -2
@@ -446,44 +444,44 @@ class RigidMeshDeformer2D {
             }
         }
 
-        let hX00 = extractSubMatrix(from: hX, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: 0, subRows: nFreeVerts, subCols: nFreeVerts)
-        let hY00 = extractSubMatrix(from: hY, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: 0, subRows: nFreeVerts, subCols: nFreeVerts)
+        let hX00 = self.extractSubMatrix(from: hX, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: 0, subRows: nFreeVerts, subCols: nFreeVerts)
+        let hY00 = self.extractSubMatrix(from: hY, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: 0, subRows: nFreeVerts, subCols: nFreeVerts)
 
-        let hX01 = extractSubMatrix(from: hX, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: nFreeVerts, subRows: nFreeVerts, subCols: nConstraints)
-        let hY01 = extractSubMatrix(from: hY, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: nFreeVerts, subRows: nFreeVerts, subCols: nConstraints)
+        let hX01 = self.extractSubMatrix(from: hX, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: nFreeVerts, subRows: nFreeVerts, subCols: nConstraints)
+        let hY01 = self.extractSubMatrix(from: hY, rows: nVerts, cols: nVerts, rowOffset: 0, colOffset: nFreeVerts, subRows: nFreeVerts, subCols: nConstraints)
 
-        hxPrime = hX00
-        hyPrime = hY00
-        dx = hX01
-        dy = hY01
+        self.hxPrime = hX00
+        self.hyPrime = hY00
+        self.dx = hX01
+        self.dy = hY01
 
         var ipivX = [__LAPACK_int](repeating: 0, count: nFreeVerts)
         var errorX: __LAPACK_int = 0
         var n_lapackX = __LAPACK_int(nFreeVerts)
-        dgetrf_(&n_lapackX, &n_lapackX, &hxPrime, &n_lapackX, &ipivX, &errorX)
+        dgetrf_(&n_lapackX, &n_lapackX, &self.hxPrime, &n_lapackX, &ipivX, &errorX)
         if errorX == 0 {
-            luDecompX = LUDecomposition(luMatrix: hxPrime, pivotIndices: ipivX)
+            self.luDecompX = LUDecomposition(luMatrix: self.hxPrime, pivotIndices: ipivX)
         }
 
         var ipivY = [__LAPACK_int](repeating: 0, count: nFreeVerts)
         var errorY: __LAPACK_int = 0
         var n_lapackY = __LAPACK_int(nFreeVerts)
-        dgetrf_(&n_lapackY, &n_lapackY, &hyPrime, &n_lapackY, &ipivY, &errorY)
+        dgetrf_(&n_lapackY, &n_lapackY, &self.hyPrime, &n_lapackY, &ipivY, &errorY)
         if errorY == 0 {
-            luDecompY = LUDecomposition(luMatrix: hyPrime, pivotIndices: ipivY)
+            self.luDecompY = LUDecomposition(luMatrix: self.hyPrime, pivotIndices: ipivY)
         }
     }
     
     private func validateDeformedMesh(rigid: Bool) {
-        let nConstraints = constraints.count
+        let nConstraints = self.constraints.count
         if nConstraints < 2 {
             return
         }
 
-        validateSetup()
+        self.validateSetup()
 
-        let constraintsVec = constraints.sorted()
-        let nVerts = deformedVerts.count
+        let constraintsVec = self.constraints.sorted()
+        let nVerts = self.deformedVerts.count
         let nFreeVerts = nVerts - nConstraints
 
         var vQ = [Double](repeating: 0.0, count: 2 * nConstraints)
@@ -496,32 +494,32 @@ class RigidMeshDeformer2D {
         let constSize = 2 * nConstraints
         var vU = [Double](repeating: 0.0, count: freeSize)
 
-        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(freeSize), __LAPACK_int(constSize), 1.0, firstMatrix, __LAPACK_int(constSize), vQ, 1, 0.0, &vU, 1)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(freeSize), __LAPACK_int(constSize), 1.0, self.firstMatrix, __LAPACK_int(constSize), vQ, 1, 0.0, &vU, 1)
 
-        for i in 0..<nVerts {
+        for i in 0 ..< nVerts {
             let c = Constraint(vertex: i, constrainedPos: .zero)
-            if !constraints.contains(c) {
-                let nRow = vertexMap[i]
+            if !self.constraints.contains(c) {
+                let nRow = self.vertexMap[i]
                 let fX = vU[2 * nRow]
                 let fY = vU[2 * nRow + 1]
-                deformedVerts[i].position = Vector2f(Float(fX), Float(fY))
+                self.deformedVerts[i].position = Vector2f(Float(fX), Float(fY))
             }
         }
 
         if rigid {
-            for i in 0..<triangles.count {
-                updateScaledTriangle(nTriangle: i)
+            for i in 0 ..< self.triangles.count {
+                self.updateScaledTriangle(nTriangle: i)
             }
-            applyFittingStep()
+            self.applyFittingStep()
         }
     }
     
     private func updateScaledTriangle(nTriangle: Int) {
-        var t = triangles[nTriangle]
+        var t = self.triangles[nTriangle]
 
-        let vDeformedV0 = deformedVerts[Int(t.verts[0])].position
-        let vDeformedV1 = deformedVerts[Int(t.verts[1])].position
-        let vDeformedV2 = deformedVerts[Int(t.verts[2])].position
+        let vDeformedV0 = self.deformedVerts[Int(t.verts[0])].position
+        let vDeformedV1 = self.deformedVerts[Int(t.verts[1])].position
+        let vDeformedV2 = self.deformedVerts[Int(t.verts[2])].position
         let vDeformed: [Double] = [
             Double(vDeformedV0.x), Double(vDeformedV0.y),
             Double(vDeformedV1.x), Double(vDeformedV1.y),
@@ -543,8 +541,8 @@ class RigidMeshDeformer2D {
         let vFitted01Perp = Vector2f(vFitted01.y, -vFitted01.x)
         var vFitted2 = vFitted0 + x01 * vFitted01 + y01 * vFitted01Perp
 
-        let vOrigV0 = initialVerts[Int(t.verts[0])].position
-        let vOrigV1 = initialVerts[Int(t.verts[1])].position
+        let vOrigV0 = self.initialVerts[Int(t.verts[0])].position
+        let vOrigV1 = self.initialVerts[Int(t.verts[1])].position
         let fScale = length(vOrigV1 - vOrigV0) / length(vFitted01)
 
         vFitted0 *= fScale
@@ -555,23 +553,23 @@ class RigidMeshDeformer2D {
         t.scaled[1] = vFitted1
         t.scaled[2] = vFitted2
         
-        triangles[nTriangle] = t
+        self.triangles[nTriangle] = t
     }
     
     private func applyFittingStep() {
-        let constraintsVec = constraints.sorted()
-        let nVerts = deformedVerts.count
+        let constraintsVec = self.constraints.sorted()
+        let nVerts = self.deformedVerts.count
         let nConstraints = constraintsVec.count
         let nFreeVerts = nVerts - nConstraints
 
         var vFX = [Double](repeating: 0.0, count: nVerts)
         var vFY = [Double](repeating: 0.0, count: nVerts)
 
-        for i in 0..<triangles.count {
-            let t = triangles[i]
-            for j in 0..<3 {
-                let nA = vertexMap[Int(t.verts[j])]
-                let nB = vertexMap[Int(t.verts[(j + 1) % 3])]
+        for i in 0 ..< self.triangles.count {
+            let t = self.triangles[i]
+            for j in 0 ..< 3 {
+                let nA = self.vertexMap[Int(t.verts[j])]
+                let nB = self.vertexMap[Int(t.verts[(j + 1) % 3])]
 
                 let vDeformedA = t.scaled[j]
                 let vDeformedB = t.scaled[(j + 1) % 3]
@@ -589,18 +587,18 @@ class RigidMeshDeformer2D {
 
         var vQX = [Double](repeating: 0.0, count: nConstraints)
         var vQY = [Double](repeating: 0.0, count: nConstraints)
-        for i in 0..<nConstraints {
+        for i in 0 ..< nConstraints {
             vQX[i] = Double(constraintsVec[i].constrainedPos.x)
             vQY[i] = Double(constraintsVec[i].constrainedPos.y)
         }
 
         var rhsX = [Double](repeating: 0.0, count: nFreeVerts)
-        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(nFreeVerts), __LAPACK_int(nConstraints), 1.0, dx, __LAPACK_int(nConstraints), vQX, 1, 0.0, &rhsX, 1)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(nFreeVerts), __LAPACK_int(nConstraints), 1.0, self.dx, __LAPACK_int(nConstraints), vQX, 1, 0.0, &rhsX, 1)
         vDSP_vaddD(rhsX, 1, vF0X, 1, &rhsX, 1, vDSP_Length(nFreeVerts))
         vDSP_vnegD(rhsX, 1, &rhsX, 1, vDSP_Length(nFreeVerts))
 
         var rhsY = [Double](repeating: 0.0, count: nFreeVerts)
-        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(nFreeVerts), __LAPACK_int(nConstraints), 1.0, dy, __LAPACK_int(nConstraints), vQY, 1, 0.0, &rhsY, 1)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, __LAPACK_int(nFreeVerts), __LAPACK_int(nConstraints), 1.0, self.dy, __LAPACK_int(nConstraints), vQY, 1, 0.0, &rhsY, 1)
         vDSP_vaddD(rhsY, 1, vF0Y, 1, &rhsY, 1, vDSP_Length(nFreeVerts))
         vDSP_vnegD(rhsY, 1, &rhsY, 1, vDSP_Length(nFreeVerts))
 
@@ -618,18 +616,18 @@ class RigidMeshDeformer2D {
         var pivotY = luY.pivotIndices
         dgetrs_("N".cString(using: .utf8)!, &n_lapack, &nrhs, &luMatrixY, &n_lapack, &pivotY, &solY, &n_lapack, &error)
 
-        for i in 0..<nVerts {
+        for i in 0 ..< nVerts {
             let c = Constraint(vertex: i, constrainedPos: .zero)
-            if !constraints.contains(c) {
-                let row = vertexMap[i]
-                deformedVerts[i].position.x = Float(solX[row])
-                deformedVerts[i].position.y = Float(solY[row])
+            if !self.constraints.contains(c) {
+                let row = self.vertexMap[i]
+                self.deformedVerts[i].position.x = Float(solX[row])
+                self.deformedVerts[i].position.y = Float(solY[row])
             }
         }
     }
     
     private func getInitialVert(nVert: Int) -> Vector2f {
-        return initialVerts[Int(nVert)].position
+        return self.initialVerts[Int(nVert)].position
     }
     
     private func barycentricCoords(p: Vector2f, a: Vector2f, b: Vector2f, c: Vector2f) -> Vector3f {

@@ -1,0 +1,34 @@
+--swiftversion 5
+--exclude KissXML,SMChemSketchSwiftCore/SMImages.swift
+--binarygrouping 4,8
+--closingparen balanced
+--commas inline
+--conflictmarkers reject
+--decimalgrouping 3,6
+--empty void
+--exponentcase lowercase
+--exponentgrouping disabled
+--extensionacl on-declarations
+--fractiongrouping disabled
+--fragment false
+--header ignore
+--hexgrouping 4,8
+--hexliteralcase uppercase
+--ifdef no-indent
+--importgrouping alphabetized
+--indent 4
+--indentcase false
+--linebreaks lf
+--modifierorder public,private,static,override
+--octalgrouping none
+--operatorfunc spaced
+--patternlet hoist
+--ranges spaced
+--redundanttype explicit
+--self insert
+--semicolons inline
+--trailingclosures
+--trimwhitespace nonblank-lines
+--wraparguments preserve
+--wrapcollections preserve
+--disable unusedArguments,wrapMultilineStatementBraces,redundantNilInit,redundantReturn,redundantInternal,andOperator, redundantLet,trailingClosures

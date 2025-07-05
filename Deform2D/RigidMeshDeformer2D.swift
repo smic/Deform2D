@@ -554,9 +554,73 @@ class RigidMeshDeformer2D {
     }
     
     private func applyFittingStep() {
-        // This is a complex matrix setup that would require a full
-        // port of the Wml::GMatrixd and related linear algebra code.
-        // For now, this is a placeholder.
+        let constraintsVec = constraints.sorted()
+        let nVerts = deformedVerts.count
+        let nConstraints = constraintsVec.count
+        let nFreeVerts = nVerts - nConstraints
+
+        var vFX = [Double](repeating: 0.0, count: nVerts)
+        var vFY = [Double](repeating: 0.0, count: nVerts)
+
+        for i in 0..<triangles.count {
+            let t = triangles[i]
+            for j in 0..<3 {
+                let nA = vertexMap[Int(t.verts[j])]
+                let nB = vertexMap[Int(t.verts[(j + 1) % 3])]
+
+                let vDeformedA = t.scaled[j]
+                let vDeformedB = t.scaled[(j + 1) % 3]
+
+                vFX[nA] += Double(-2 * vDeformedA.x + 2 * vDeformedB.x)
+                vFX[nB] += Double(2 * vDeformedA.x - 2 * vDeformedB.x)
+
+                vFY[nA] += Double(-2 * vDeformedA.y + 2 * vDeformedB.y)
+                vFY[nB] += Double(2 * vDeformedA.y - 2 * vDeformedB.y)
+            }
+        }
+
+        let vF0X = Array(vFX.prefix(nFreeVerts))
+        let vF0Y = Array(vFY.prefix(nFreeVerts))
+
+        var vQX = [Double](repeating: 0.0, count: nConstraints)
+        var vQY = [Double](repeating: 0.0, count: nConstraints)
+        for i in 0..<nConstraints {
+            vQX[i] = Double(constraintsVec[i].constrainedPos.x)
+            vQY[i] = Double(constraintsVec[i].constrainedPos.y)
+        }
+
+        var rhsX = [Double](repeating: 0.0, count: nFreeVerts)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, Int32(nFreeVerts), Int32(nConstraints), 1.0, dx, Int32(nConstraints), vQX, 1, 0.0, &rhsX, 1)
+        vDSP_vaddD(rhsX, 1, vF0X, 1, &rhsX, 1, vDSP_Length(nFreeVerts))
+        vDSP_vnegD(rhsX, 1, &rhsX, 1, vDSP_Length(nFreeVerts))
+
+        var rhsY = [Double](repeating: 0.0, count: nFreeVerts)
+        cblas_dgemv(CblasRowMajor, CblasNoTrans, Int32(nFreeVerts), Int32(nConstraints), 1.0, dy, Int32(nConstraints), vQY, 1, 0.0, &rhsY, 1)
+        vDSP_vaddD(rhsY, 1, vF0Y, 1, &rhsY, 1, vDSP_Length(nFreeVerts))
+        vDSP_vnegD(rhsY, 1, &rhsY, 1, vDSP_Length(nFreeVerts))
+
+        guard let luX = luDecompX, let luY = luDecompY else { return }
+        var solX = rhsX
+        var solY = rhsY
+        var n_lapack = __LAPACK_int(nFreeVerts)
+        var nrhs: __LAPACK_int = 1
+        var error: __LAPACK_int = 0
+        var luMatrixX = luX.luMatrix
+        var pivotX = luX.pivotIndices
+        dgetrs_("N".cString(using: .utf8)!, &n_lapack, &nrhs, &luMatrixX, &n_lapack, &pivotX, &solX, &n_lapack, &error)
+
+        var luMatrixY = luY.luMatrix
+        var pivotY = luY.pivotIndices
+        dgetrs_("N".cString(using: .utf8)!, &n_lapack, &nrhs, &luMatrixY, &n_lapack, &pivotY, &solY, &n_lapack, &error)
+
+        for i in 0..<nVerts {
+            let c = Constraint(vertex: UInt32(i), constrainedPos: .zero)
+            if !constraints.contains(c) {
+                let row = vertexMap[i]
+                deformedVerts[i].position.x = Float(solX[row])
+                deformedVerts[i].position.y = Float(solY[row])
+            }
+        }
     }
     
     private func getInitialVert(nVert: UInt32) -> Vector2f {

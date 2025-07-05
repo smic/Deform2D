@@ -98,7 +98,7 @@ class RigidMeshDeformer2D {
         let nVerts = mesh.getNumVertices()
         for i in 0 ..< nVerts {
             var vertex: Vector3f = .zero
-            mesh.getVertex(i: i, v: &vertex)
+            mesh.getVertex(vertexIndex: i, vertex: &vertex)
             let v = Vertex(position: Vector2f(vertex.x, vertex.y))
             self.initialVerts.append(v)
             self.deformedVerts.append(v)
@@ -125,7 +125,7 @@ class RigidMeshDeformer2D {
                 let v2 = self.getInitialVert(nVert: t.verts[n2])
                 
                 let v01 = v1 - v0
-                let v01N = normalize(v01)
+//                let v01N = normalize(v01)
                 let v01Rot90 = Vector2f(v01.y, -v01.x)
                 
                 let vLocal = v2 - v0
@@ -645,13 +645,4 @@ class RigidMeshDeformer2D {
         let u = 1.0 - v - w
         return Vector3f(u, v, w)
     }
-}
-
-// Dummy TriangleMesh for compilation
-class TriangleMesh {
-    func getNumVertices() -> Int { return 0 }
-    func getNumTriangles() -> Int { return 0 }
-    func getVertex(i: Int, v: inout Vector3f) {}
-    func getTriangle(i: Int, v: inout [Int]) {}
-    func setVertex(i: Int, v: Vector3f) {}
 }

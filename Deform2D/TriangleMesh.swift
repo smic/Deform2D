@@ -2,27 +2,14 @@
 import Foundation
 import simd
 
-class TriangleMesh {
-    typealias VertexIndex = Int
-    typealias TriangleIndex = Int
+public final class TriangleMesh {
+    public typealias VertexIndex = Int
+    public typealias TriangleIndex = Int
 
-    private var vertices: [SIMD3<Float>] = []
-    private var normals: [SIMD3<Float>] = []
-    private var colors: [SIMD3<Float>] = []
-    private var textureCoords: [SIMD2<Float>] = []
+    private var vertices: [Vector2f] = []
     private var triangles: [VertexIndex] = []
-    private var triTexCoords: [SIMD2<Float>] = []
 
-    enum FileFormat {
-        case objFormat, meshLiteFormat
-    }
-
-    private var filename: String = "default.obj"
-    private var fileFormat: FileFormat = .objFormat
-    private var fileError: String = "no error"
-
-    init(filename: String = "default.obj", vertexSizeHint: Int = 0, triangleSizeHint: Int = 0) {
-        self.filename = filename
+    public init(vertexSizeHint: Int = 0, triangleSizeHint: Int = 0) {
         self.initialize(vertexSizeHint: vertexSizeHint, triangleSizeHint: triangleSizeHint)
     }
     
@@ -37,50 +24,35 @@ class TriangleMesh {
     private func initialize(vertexSizeHint: Int, triangleSizeHint: Int) {
         if vertexSizeHint > 0 {
             self.vertices.reserveCapacity(vertexSizeHint)
-            self.normals.reserveCapacity(vertexSizeHint)
-            self.colors.reserveCapacity(vertexSizeHint)
-            self.textureCoords.reserveCapacity(vertexSizeHint)
         }
         if triangleSizeHint > 0 {
             self.triangles.reserveCapacity(triangleSizeHint * 3)
         }
     }
     
-    func getVertex(vertexIndex: VertexIndex, vertex: inout SIMD3<Float>) {
+    func getVertex(vertexIndex: VertexIndex, vertex: inout Vector2f) {
         vertex = self.vertices[vertexIndex]
     }
 
-    func getVertex(vertexIndex: VertexIndex, vertex: inout SIMD3<Float>, normal: inout SIMD3<Float>?) {
-        vertex = self.vertices[vertexIndex]
-        if normal != nil && vertexIndex < self.normals.count {
-            normal! = self.normals[vertexIndex]
-        }
-    }
-
-    func getTriangle(triangleIndex: TriangleIndex, vTriangle: inout [SIMD3<Float>], pNormals: inout [SIMD3<Float>]?) {
-        let triIndices = self.getTriangleIndices(triangleIndex: triangleIndex)
-        vTriangle[0] = self.vertices[triIndices[0]]
-        vTriangle[1] = self.vertices[triIndices[1]]
-        vTriangle[2] = self.vertices[triIndices[2]]
-        if pNormals != nil {
-            pNormals![0] = self.normals[triIndices[0]]
-            pNormals![1] = self.normals[triIndices[1]]
-            pNormals![2] = self.normals[triIndices[2]]
-        }
+    func getTriangle(triangleIndex: TriangleIndex, vertices: inout [Vector2f]) {
+        let triangleIndices = self.getTriangleIndices(triangleIndex: triangleIndex)
+        vertices[0] = self.vertices[triangleIndices[0]]
+        vertices[1] = self.vertices[triangleIndices[1]]
+        vertices[2] = self.vertices[triangleIndices[2]]
     }
     
-    func getTriangle(i: Int, v: inout [VertexIndex]) {
-        let startIndex = i * 3
-        v[0] = self.triangles[startIndex]
-        v[1] = self.triangles[startIndex + 1]
-        v[2] = self.triangles[startIndex + 2]
+    func getTriangle(triangleIndex: TriangleIndex, vertexIndices: inout [VertexIndex]) {
+        let startIndex = triangleIndex * 3
+        vertexIndices[0] = self.triangles[startIndex]
+        vertexIndices[1] = self.triangles[startIndex + 1]
+        vertexIndices[2] = self.triangles[startIndex + 2]
     }
 
-    func getNumVertices() -> Int {
+    func getVerticesCount() -> Int {
         return self.vertices.count
     }
 
-    func getNumTriangles() -> Int {
+    func getTrianglesCount() -> Int {
         return self.triangles.count / 3
     }
 
@@ -94,38 +66,28 @@ class TriangleMesh {
     }
 
     @discardableResult
-    func appendVertex(vertex: SIMD3<Float>) -> VertexIndex {
+    func appendVertex(vertex: Vector2f) -> VertexIndex {
         let newID = self.vertices.count
         self.vertices.append(vertex)
         return VertexIndex(newID)
     }
 
-    @discardableResult
-    func appendNormal(normal: SIMD3<Float>) -> VertexIndex {
-        let newID = self.normals.count
-        self.normals.append(normal)
-        return VertexIndex(newID)
-    }
-
-    func setVertex(i: VertexIndex, v: SIMD3<Float>) {
-        if i < self.vertices.count {
-            self.vertices[i] = v
+    func setVertex(vertexIndex: VertexIndex, vertex: Vector2f) {
+        if vertexIndex < self.vertices.count {
+            self.vertices[vertexIndex] = vertex
         }
     }
 
-    convenience init?(fileURL: URL) {
+    convenience init(fileURL: URL) throws {
         self.init()
-        guard self.read(from: fileURL) else { return nil }
+        try self.read(from: fileURL)
     }
 
-    func read(from url: URL) -> Bool {
-        guard let content = try? String(contentsOf: url) else {
-            self.fileError = "Cannot open file \(url.path)"
-            return false
-        }
+    func read(from url: URL) throws {
+        let content = try String(contentsOf: url, encoding: .utf8)
 
         let lines = content.split(separator: "\n")
-        var tempNormals: [SIMD3<Float>] = []
+//        var tempNormals: [SIMD3<Float>] = []
 
         for line in lines {
             let components = line.split(separator: " ")
@@ -136,14 +98,15 @@ class TriangleMesh {
                 guard components.count >= 4,
                       let x = Float(components[1]),
                       let y = Float(components[2]),
-                      let z = Float(components[3]) else { continue }
-                self.appendVertex(vertex: SIMD3<Float>(x, y, z))
+                      let _ = Float(components[3]) else { continue }
+                self.appendVertex(vertex: Vector2f(x, y))
             case "vn":
-                guard components.count >= 4,
-                      let x = Float(components[1]),
-                      let y = Float(components[2]),
-                      let z = Float(components[3]) else { continue }
-                tempNormals.append(normalize(SIMD3<Float>(x, y, z)))
+//                guard components.count >= 4,
+//                      let x = Float(components[1]),
+//                      let y = Float(components[2]),
+//                      let z = Float(components[3]) else { continue }
+//                tempNormals.append(normalize(SIMD3<Float>(x, y, z)))
+                break
             case "f":
                 guard components.count >= 4 else { continue }
                 var vertexIndices: [VertexIndex] = []
@@ -160,11 +123,14 @@ class TriangleMesh {
                 break
             }
         }
-        return true
     }
 
     private func getTriangleIndices(triangleIndex: TriangleIndex) -> [VertexIndex] {
         let startIndex = triangleIndex * 3
-        return [self.triangles[startIndex], self.triangles[startIndex + 1], self.triangles[startIndex + 2]]
+        return [
+            self.triangles[startIndex],
+            self.triangles[startIndex + 1],
+            self.triangles[startIndex + 2]
+        ]
     }
 }

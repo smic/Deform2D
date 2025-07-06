@@ -3,24 +3,23 @@ import Accelerate
 import Foundation
 import simd
 
-typealias Vector2f = SIMD2<Float>
-typealias Vector3f = SIMD3<Float>
-// typealias Matrix = simd_float4x4
+public typealias Vector2f = SIMD2<Float>
+public typealias Vector3f = SIMD3<Float>
 
-class RigidMeshDeformer2D {
-    struct Vertex {
+public class RigidMeshDeformer2D {
+    private struct Vertex {
         var position: Vector2f
     }
     
-    struct Triangle {
-        var vertices: [Int] = [0, 0, 0]
+    private struct Triangle {
+        var vertexIndices: [Int] = [0, 0, 0]
         var triCoordinates: [Vector2f] = [.zero, .zero, .zero]
         var scaled: [Vector2f] = [.zero, .zero, .zero]
         var f: [Double] = []
         var c: [Double] = []
     }
     
-    struct Constraint: Comparable, Hashable {
+    private struct Constraint: Comparable, Hashable {
         var vertex: Int
         var constrainedPosition: Vector2f
         
@@ -43,7 +42,7 @@ class RigidMeshDeformer2D {
     private var constraints: Set<Constraint> = []
     private var setupValid: Bool = false
     
-    struct LUDecomposition {
+    private struct LUDecomposition {
         var luMatrix: [Double]
         var pivotIndices: [__LAPACK_int]
     }
@@ -58,31 +57,31 @@ class RigidMeshDeformer2D {
     private var luDecompX: LUDecomposition?
     private var luDecompY: LUDecomposition?
     
-    init() {
+    public init() {
         self.invalidateSetup()
     }
     
-    func forceValidation() {
+    public func forceValidation() {
         self.validateSetup()
     }
     
-    func removeHandle(handle: Int) {
+    public func removeHandle(handle: Int) {
         let contraint = Constraint(vertex: handle, constrainedPosition: Vector2f.zero)
         self.constraints.remove(contraint)
         self.deformedVertices[handle].position = self.initialVertices[handle].position
         self.invalidateSetup()
     }
     
-    func setDeformedHandle(handle: Int, pos: Vector2f) {
+    public func setDeformedHandle(handle: Int, pos: Vector2f) {
         let constraint = Constraint(vertex: handle, constrainedPosition: pos)
         self.updateConstraint(constraint)
     }
     
-    func unTransformPoint(transform: inout Vector2f) {
+    private func unTransformPoint(transform: inout Vector2f) {
         for i in 0 ..< self.triangles.count {
-            let v1 = self.deformedVertices[self.triangles[i].vertices[0]].position
-            let v2 = self.deformedVertices[self.triangles[i].vertices[1]].position
-            let v3 = self.deformedVertices[self.triangles[i].vertices[2]].position
+            let v1 = self.deformedVertices[self.triangles[i].vertexIndices[0]].position
+            let v2 = self.deformedVertices[self.triangles[i].vertexIndices[1]].position
+            let v3 = self.deformedVertices[self.triangles[i].vertexIndices[2]].position
             
             let barycentric = self.barycentricCoords(p: transform, a: v1, b: v2, c: v3)
             if barycentric.x < 0 || barycentric.x > 1 ||
@@ -91,35 +90,35 @@ class RigidMeshDeformer2D {
                 continue
             }
             
-            let v1Init = self.initialVertices[self.triangles[i].vertices[0]].position
-            let v2Init = self.initialVertices[self.triangles[i].vertices[1]].position
-            let v3Init = self.initialVertices[self.triangles[i].vertices[2]].position
+            let v1Init = self.initialVertices[self.triangles[i].vertexIndices[0]].position
+            let v2Init = self.initialVertices[self.triangles[i].vertexIndices[1]].position
+            let v3Init = self.initialVertices[self.triangles[i].vertexIndices[2]].position
             transform = barycentric.x * v1Init + barycentric.y * v2Init + barycentric.z * v3Init
             return
         }
     }
     
-    func initializeFromMesh(mesh: TriangleMesh) {
+    public func initializeFromMesh(mesh: TriangleMesh) {
         self.constraints.removeAll()
         self.initialVertices.removeAll()
         self.deformedVertices.removeAll()
         self.triangles.removeAll()
         
-        let nVertices = mesh.getNumVertices()
+        let nVertices = mesh.getVerticesCount()
         for i in 0 ..< nVertices {
-            var vertex: Vector3f = .zero
+            var vertex: Vector2f = .zero
             mesh.getVertex(vertexIndex: i, vertex: &vertex)
-            let v = Vertex(position: Vector2f(vertex.x, vertex.y))
+            let v = Vertex(position: vertex)
             self.initialVertices.append(v)
             self.deformedVertices.append(v)
         }
         
-        let nTriangles = mesh.getNumTriangles()
+        let nTriangles = mesh.getTrianglesCount()
         for i in 0 ..< nTriangles {
             var t = Triangle()
-            var vertices: [Int] = [0, 0, 0]
-            mesh.getTriangle(i: i, v: &vertices)
-            t.vertices = vertices
+            var vertexIndices: [Int] = [0, 0, 0]
+            mesh.getTriangle(triangleIndex: i, vertexIndices: &vertexIndices)
+            t.vertexIndices = vertexIndices
             self.triangles.append(t)
         }
         
@@ -130,9 +129,9 @@ class RigidMeshDeformer2D {
                 let n1 = (j + 1) % 3
                 let n2 = (j + 2) % 3
                 
-                let v0 = self.getInitialVert(nVertices: t.vertices[n0])
-                let v1 = self.getInitialVert(nVertices: t.vertices[n1])
-                let v2 = self.getInitialVert(nVertices: t.vertices[n2])
+                let v0 = self.getInitialVert(nVertices: t.vertexIndices[n0])
+                let v1 = self.getInitialVert(nVertices: t.vertexIndices[n1])
+                let v2 = self.getInitialVert(nVertices: t.vertexIndices[n2])
                 
                 let v01 = v1 - v0
 //                let v01N = normalize(v01)
@@ -148,15 +147,15 @@ class RigidMeshDeformer2D {
         }
     }
     
-    func updateDeformedMesh(mesh: inout TriangleMesh, rigid: Bool) {
+    public func updateDeformedMesh(mesh: inout TriangleMesh, rigid: Bool) {
         self.validateDeformedMesh(rigid: rigid)
         
         let useVertices = self.constraints.count > 1 ? self.deformedVertices : self.initialVertices
         
-        let nVertices = mesh.getNumVertices()
+        let nVertices = mesh.getVerticesCount()
         for i in 0 ..< nVertices {
             let newPosition = useVertices[i].position
-            mesh.setVertex(i: i, v: Vector3f(newPosition.x, newPosition.y, 0.0))
+            mesh.setVertex(vertexIndex: i, vertex: newPosition)
         }
     }
     
@@ -228,11 +227,11 @@ class RigidMeshDeformer2D {
         for i in 0 ..< self.triangles.count {
             let t = self.triangles[i]
             for j in 0 ..< 3 {
-                let n0x = 2 * self.vertexMap[t.vertices[j]]
+                let n0x = 2 * self.vertexMap[t.vertexIndices[j]]
                 let n0y = n0x + 1
-                let n1x = 2 * self.vertexMap[t.vertices[(j + 1) % 3]]
+                let n1x = 2 * self.vertexMap[t.vertexIndices[(j + 1) % 3]]
                 let n1y = n1x + 1
-                let n2x = 2 * self.vertexMap[t.vertices[(j + 2) % 3]]
+                let n2x = 2 * self.vertexMap[t.vertexIndices[(j + 2) % 3]]
                 let n2y = n2x + 1
                 let x = Double(t.triCoordinates[j].x)
                 let y = Double(t.triCoordinates[j].y)
@@ -334,7 +333,7 @@ class RigidMeshDeformer2D {
         let k1 = x12 * y01 + (-1 + x01) * y12
         let k2 = -x12 + x01 * x12 - y01 * y12
         let k3 = -y01 + x20 * y01 + x01 * y20
-        let k4 = -y01 + x01 * y01 + x01 * y20
+        // let k4 = -y01 + x01 * y01 + x01 * y20
         let k5 = -x01 + x01 * x20 - y01 * y20
 
         let a = -1 + x01
@@ -441,8 +440,8 @@ class RigidMeshDeformer2D {
         for i in 0 ..< self.triangles.count {
             let t = self.triangles[i]
             for j in 0 ..< 3 {
-                let nA = self.vertexMap[t.vertices[j]]
-                let nB = self.vertexMap[t.vertices[(j + 1) % 3]]
+                let nA = self.vertexMap[t.vertexIndices[j]]
+                let nB = self.vertexMap[t.vertexIndices[(j + 1) % 3]]
 
                 hX[nA * nVertices + nA] += 2
                 hX[nA * nVertices + nB] += -2
@@ -524,22 +523,14 @@ class RigidMeshDeformer2D {
             }
             self.applyFittingStep()
         }
-        
-//        for c in self.constraints {
-//            print("Constraint Vertex:", c.vertex, "Position:", c.constrainedPosition)
-//        }
-//
-//        for i in 0 ..< nVertices {
-//            print("Vertex:", i, "init:", self.initialVertices[i].position, "deform:", self.deformedVertices[i].position)
-//        }
     }
     
     private func updateScaledTriangle(nTriangle: Int) {
         var t = self.triangles[nTriangle]
 
-        let vDeformedV0 = self.deformedVertices[t.vertices[0]].position
-        let vDeformedV1 = self.deformedVertices[t.vertices[1]].position
-        let vDeformedV2 = self.deformedVertices[t.vertices[2]].position
+        let vDeformedV0 = self.deformedVertices[t.vertexIndices[0]].position
+        let vDeformedV1 = self.deformedVertices[t.vertexIndices[1]].position
+        let vDeformedV2 = self.deformedVertices[t.vertexIndices[2]].position
         let vDeformed: [Double] = [
             Double(vDeformedV0.x), Double(vDeformedV0.y),
             Double(vDeformedV1.x), Double(vDeformedV1.y),
@@ -561,8 +552,8 @@ class RigidMeshDeformer2D {
         let vFitted01Perp = Vector2f(vFitted01.y, -vFitted01.x)
         var vFitted2 = vFitted0 + x01 * vFitted01 + y01 * vFitted01Perp
 
-        let vOrigV0 = self.initialVertices[t.vertices[0]].position
-        let vOrigV1 = self.initialVertices[t.vertices[1]].position
+        let vOrigV0 = self.initialVertices[t.vertexIndices[0]].position
+        let vOrigV1 = self.initialVertices[t.vertexIndices[1]].position
         let fScale = length(vOrigV1 - vOrigV0) / length(vFitted01)
 
         vFitted0 *= fScale
@@ -588,8 +579,8 @@ class RigidMeshDeformer2D {
         for i in 0 ..< self.triangles.count {
             let t = self.triangles[i]
             for j in 0 ..< 3 {
-                let nA = self.vertexMap[t.vertices[j]]
-                let nB = self.vertexMap[t.vertices[(j + 1) % 3]]
+                let nA = self.vertexMap[t.vertexIndices[j]]
+                let nB = self.vertexMap[t.vertexIndices[(j + 1) % 3]]
 
                 let vDeformedA = t.scaled[j]
                 let vDeformedB = t.scaled[(j + 1) % 3]

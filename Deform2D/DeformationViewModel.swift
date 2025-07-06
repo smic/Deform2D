@@ -3,10 +3,11 @@ import Foundation
 import simd
 
 @Observable
-final class DeformationViewModel {
+public final class DeformationViewModel {
     @ObservationIgnored
-    var deformedMesh: TriangleMesh
-    var selectedVertices: Set<TriangleMesh.VertexIndex> = []
+    public var deformedMesh: TriangleMesh
+    public var selectedVertices: Set<TriangleMesh.VertexIndex> = []
+    public var selectedVertex: TriangleMesh.VertexIndex? = nil
 
     @ObservationIgnored
     private var deformer = RigidMeshDeformer2D()
@@ -14,11 +15,10 @@ final class DeformationViewModel {
     private var initialMesh: TriangleMesh
     @ObservationIgnored
     private var constraintsValid: Bool = false
-    private var selectedVertex: TriangleMesh.VertexIndex? = nil
 
-    init() {
+    public init() {
         if let url = Bundle.main.url(forResource: "man", withExtension: "obj"),
-           let mesh = TriangleMesh(fileURL: url) {
+           let mesh = try? TriangleMesh(fileURL: url) {
             mesh.flipVertical()
             self.initialMesh = mesh
             self.deformedMesh = mesh
@@ -33,7 +33,7 @@ final class DeformationViewModel {
                 let fY = -1.0 + Float(yi) * fYStep
                 for xi in 0 ..< nRowLen {
                     let fX = -1.0 + Float(xi) * fXStep
-                    mesh.appendVertex(vertex: SIMD3<Float>(fX, fY, 0))
+                    mesh.appendVertex(vertex: Vector2f(fX, fY))
                 }
             }
 
@@ -56,41 +56,39 @@ final class DeformationViewModel {
         self.invalidateConstraints()
     }
 
-    func updateDeformedMesh() {
+    public func updateDeformedMesh(rigid: Bool) {
         self.validateConstraints()
-        self.deformer.updateDeformedMesh(mesh: &self.deformedMesh, rigid: true)
+        self.deformer.updateDeformedMesh(mesh: &self.deformedMesh, rigid: rigid)
     }
 
-    func invalidateConstraints() {
+    private func invalidateConstraints() {
         self.constraintsValid = false
     }
 
-    func validateConstraints() {
+    private func validateConstraints() {
         if self.constraintsValid {
             return
         }
 
         for vertex in self.selectedVertices {
-            var v = SIMD3<Float>()
-            var n: SIMD3<Float>?
-            self.deformedMesh.getVertex(vertexIndex: vertex, vertex: &v, normal: &n)
-            self.deformer.setDeformedHandle(handle: vertex, pos: SIMD2<Float>(v.x, v.y))
+            var v = Vector2f()
+            self.deformedMesh.getVertex(vertexIndex: vertex, vertex: &v)
+            self.deformer.setDeformedHandle(handle: vertex, pos: Vector2f(v.x, v.y))
         }
 
         self.deformer.forceValidation()
         self.constraintsValid = true
     }
 
-    func findHitVertex(point: CGPoint, size: CGSize) -> Int? {
+    private func findHitVertex(point: CGPoint, size: CGSize) -> Int? {
         let scale = 0.5 * min(size.width, size.height) / 2.0
-        let translate = SIMD2<Float>(Float(size.width / 2), Float(size.height / 2))
+        let translate = Vector2f(Float(size.width / 2), Float(size.height / 2))
 
-        for i in 0 ..< self.deformedMesh.getNumVertices() {
-            var v = SIMD3<Float>()
-            var n: SIMD3<Float>?
-            self.deformedMesh.getVertex(vertexIndex: i, vertex: &v, normal: &n)
-            let viewPos = SIMD2<Float>(v.x, v.y) * Float(scale) + translate
-            let dist = distance(SIMD2<Float>(Float(point.x), Float(point.y)), viewPos)
+        for i in 0 ..< self.deformedMesh.getVerticesCount() {
+            var v = Vector2f()
+            self.deformedMesh.getVertex(vertexIndex: i, vertex: &v)
+            let viewPos = Vector2f(v.x, v.y) * Float(scale) + translate
+            let dist = distance(Vector2f(Float(point.x), Float(point.y)), viewPos)
             if dist < 5 {
                 return i
             }
@@ -98,35 +96,30 @@ final class DeformationViewModel {
         return nil
     }
 
-    func handleDrag(point: CGPoint, size: CGSize) {
-        print("handleDrag:", point, "selectedVertex:", selectedVertex)
+    public func handleDrag(point: CGPoint, size: CGSize) {
         if let selectedVertex = self.selectedVertex {
             let scale = 0.5 * min(size.width, size.height) / 2.0
-            let translate = SIMD2<Float>(Float(size.width / 2), Float(size.height / 2))
-            let worldPos = (SIMD2<Float>(Float(point.x), Float(point.y)) - translate) / Float(scale)
-            print("deform:", selectedVertex, "x:", worldPos.x, "y:", worldPos.y)
-            self.deformedMesh.setVertex(i: selectedVertex, v: SIMD3<Float>(worldPos.x, worldPos.y, 0))
+            let translate = Vector2f(Float(size.width / 2), Float(size.height / 2))
+            let worldPos = (Vector2f(Float(point.x), Float(point.y)) - translate) / Float(scale)
+            self.deformedMesh.setVertex(vertexIndex: selectedVertex, vertex: Vector2f(worldPos.x, worldPos.y))
             self.invalidateConstraints()
         }
     }
 
-    func selectVertex(point: CGPoint, size: CGSize) {
-        print("selectVertex:", self.findHitVertex(point: point, size: size))
+    public func selectVertex(point: CGPoint, size: CGSize) {
         if let hit = findHitVertex(point: point, size: size) {
             self.selectedVertex = hit
         }
     }
 
-    func toggleSelection(point: CGPoint, size: CGSize) {
-        print("toggle Selection:", self.findHitVertex(point: point, size: size))
+    public func toggleSelection(point: CGPoint, size: CGSize) {
         if let hit = findHitVertex(point: point, size: size) {
             if self.selectedVertices.contains(hit) {
                 self.selectedVertices.remove(hit)
                 self.deformer.removeHandle(handle: hit)
-                var v = SIMD3<Float>()
-                var n: SIMD3<Float>?
-                self.initialMesh.getVertex(vertexIndex: hit, vertex: &v, normal: &n)
-                self.deformedMesh.setVertex(i: Int(hit), v: v)
+                var v = Vector2f()
+                self.initialMesh.getVertex(vertexIndex: hit, vertex: &v)
+                self.deformedMesh.setVertex(vertexIndex: Int(hit), vertex: v)
             } else {
                 self.selectedVertices.insert(hit)
             }
@@ -134,7 +127,7 @@ final class DeformationViewModel {
         }
     }
     
-    func releaseSelection() {
+    public func releaseSelection() {
         self.selectedVertex = nil
     }
 }

@@ -11,4 +11,4 @@ paper, software, and demo java app (which does not include source).
 This code was converted from following C++ sample project using :
 https://www.dgp.toronto.edu/~rms/software/Deform2D/index.html
 
-![Screenshot](Deform2D.png|width=538)
+<img src="Deform2D.png" width="538">

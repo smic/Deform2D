@@ -1,5 +1,6 @@
-# Deform2D is an interactive demo program which implements the
-As-Rigid-As-Possible Shape Manipulation
+# Deform2D is an interactive demo program which implements the As-Rigid-As-Possible Shape Manipulation
+
+![Screenshot](Deform2D.png)
 
 The technique described in:
 

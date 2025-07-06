@@ -528,7 +528,7 @@ class RigidMeshDeformer2D {
 //        for c in self.constraints {
 //            print("Constraint Vertex:", c.vertex, "Position:", c.constrainedPosition)
 //        }
-//        
+//
 //        for i in 0 ..< nVertices {
 //            print("Vertex:", i, "init:", self.initialVertices[i].position, "deform:", self.deformedVertices[i].position)
 //        }

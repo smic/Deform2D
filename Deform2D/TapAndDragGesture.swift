@@ -16,20 +16,20 @@ struct TapAndDragGesture: Gesture {
     public var body: some Gesture {
         DragGesture(minimumDistance: 0)
             .onChanged { value in
-                if !isDragging {
-                    isDragging = true
-                    startTime = Date()
-                    onEvent(.drag(location: value.location, start: value.startLocation))
+                if !self.isDragging {
+                    self.isDragging = true
+                    self.startTime = Date()
+                    self.onEvent(.drag(location: value.location, start: value.startLocation))
                 } else {
-                    onEvent(.drag(location: value.location, start: value.startLocation))
+                    self.onEvent(.drag(location: value.location, start: value.startLocation))
                 }
             }
             .onEnded { value in
                 if let startTime = startTime, Date().timeIntervalSince(startTime) < 0.2 { // Tap if duration is short
-                    onEvent(.tap(location: value.startLocation))
+                    self.onEvent(.tap(location: value.startLocation))
                 }
-                onEvent(.release)
-                isDragging = false
+                self.onEvent(.release)
+                self.isDragging = false
                 self.startTime = nil
             }
     }

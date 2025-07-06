@@ -52,10 +52,9 @@ struct ContentView: View {
 //                    if index == selectedPointIndex {
 //                        context.fill(handlePath, with: .color(.yellow))
 //                    } else {
-                        context.fill(handlePath, with: .color(.red))
+                    context.fill(handlePath, with: .color(.red))
 //                    }
                     context.stroke(handlePath, with: .color(.black), lineWidth: 1)
-                    
                     
 //                    context.fill(Path(rect), with: .color(.red))
                 }
@@ -64,29 +63,28 @@ struct ContentView: View {
                 DragGesture(minimumDistance: 1)
                     .onChanged { value in
                         if !self.dragStarted {
-                            viewModel.selectVertex(point: value.startLocation, size: geometry.size)
+                            self.viewModel.selectVertex(point: value.startLocation, size: geometry.size)
                             print("Drag started")
                             self.dragStarted = true
                         }
 //                        if /*viewModel.selectedVertices.isEmpty*/viewModel.selectedVertex == nil {
 //                            viewModel.selectVertex(point: value.location, size: geometry.size)
 //                        }
-                        viewModel.handleDrag(point: value.location, size: geometry.size)
+                        self.viewModel.handleDrag(point: value.location, size: geometry.size)
                         self.updateCounter += 1
                     }
                     .onEnded { value in
-                        viewModel.releaseSelection()
+                        self.viewModel.releaseSelection()
                         self.dragStarted = false
                         self.updateCounter += 1
                     }
                     .simultaneously(with:
-                                        SpatialTapGesture()
-                        .onEnded { event in
-                            viewModel.toggleSelection(point: event.location, size: geometry.size)
-                            self.updateCounter += 1
-                        }
-                                   )
-                
+                        SpatialTapGesture()
+                            .onEnded { event in
+                                self.viewModel.toggleSelection(point: event.location, size: geometry.size)
+                                self.updateCounter += 1
+                            }
+                    )
                 
 //                TapAndDragGesture {
 //                    event in

@@ -115,12 +115,12 @@ class TriangleMesh {
 
     convenience init?(fileURL: URL) {
         self.init()
-        guard read(from: fileURL) else { return nil }
+        guard self.read(from: fileURL) else { return nil }
     }
 
     func read(from url: URL) -> Bool {
         guard let content = try? String(contentsOf: url) else {
-            fileError = "Cannot open file \(url.path)"
+            self.fileError = "Cannot open file \(url.path)"
             return false
         }
 
@@ -137,7 +137,7 @@ class TriangleMesh {
                       let x = Float(components[1]),
                       let y = Float(components[2]),
                       let z = Float(components[3]) else { continue }
-                appendVertex(vertex: SIMD3<Float>(x, y, z))
+                self.appendVertex(vertex: SIMD3<Float>(x, y, z))
             case "vn":
                 guard components.count >= 4,
                       let x = Float(components[1]),
@@ -147,14 +147,14 @@ class TriangleMesh {
             case "f":
                 guard components.count >= 4 else { continue }
                 var vertexIndices: [VertexIndex] = []
-                for i in 1..<4 {
+                for i in 1 ..< 4 {
                     let faceComponents = components[i].split(separator: "/")
                     if let vIndex = Int(faceComponents[0]) {
                         vertexIndices.append(vIndex - 1)
                     }
                 }
                 if vertexIndices.count == 3 {
-                    appendTriangle(v1: vertexIndices[0], v2: vertexIndices[1], v3: vertexIndices[2])
+                    self.appendTriangle(v1: vertexIndices[0], v2: vertexIndices[1], v3: vertexIndices[2])
                 }
             default:
                 break

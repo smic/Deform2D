@@ -29,19 +29,19 @@ final class DeformationViewModel {
             let fYStep: Float = 2.0 / Float(nRowLen - 1)
             let fXStep: Float = 2.0 / Float(nRowLen - 1)
 
-            for yi in 0..<nRowLen {
+            for yi in 0 ..< nRowLen {
                 let fY = -1.0 + Float(yi) * fYStep
-                for xi in 0..<nRowLen {
+                for xi in 0 ..< nRowLen {
                     let fX = -1.0 + Float(xi) * fXStep
                     mesh.appendVertex(vertex: SIMD3<Float>(fX, fY, 0))
                 }
             }
 
-            for yi in 0..<(nRowLen - 1) {
+            for yi in 0 ..< (nRowLen - 1) {
                 let nRow1 = yi * nRowLen
                 let nRow2 = (yi + 1) * nRowLen
 
-                for xi in 0..<(nRowLen - 1) {
+                for xi in 0 ..< (nRowLen - 1) {
                     let nTri1: [UInt32] = [nRow1 + xi, nRow2 + xi + 1, nRow1 + xi + 1]
                     let nTri2: [UInt32] = [nRow1 + xi, nRow2 + xi, nRow2 + xi + 1]
                     mesh.appendTriangle(v1: Int(nTri1[0]), v2: Int(nTri1[1]), v3: Int(nTri1[2]))
@@ -52,8 +52,8 @@ final class DeformationViewModel {
             self.deformedMesh = mesh
         }
         
-        self.deformer.initializeFromMesh(mesh: initialMesh)
-        invalidateConstraints()
+        self.deformer.initializeFromMesh(mesh: self.initialMesh)
+        self.invalidateConstraints()
     }
 
     func updateDeformedMesh() {
@@ -111,14 +111,14 @@ final class DeformationViewModel {
     }
 
     func selectVertex(point: CGPoint, size: CGSize) {
-        print("selectVertex:", findHitVertex(point: point, size: size))
+        print("selectVertex:", self.findHitVertex(point: point, size: size))
         if let hit = findHitVertex(point: point, size: size) {
             self.selectedVertex = hit
         }
     }
 
     func toggleSelection(point: CGPoint, size: CGSize) {
-        print("toggle Selection:", findHitVertex(point: point, size: size))
+        print("toggle Selection:", self.findHitVertex(point: point, size: size))
         if let hit = findHitVertex(point: point, size: size) {
             if self.selectedVertices.contains(hit) {
                 self.selectedVertices.remove(hit)
